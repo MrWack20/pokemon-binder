@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Book, Plus, Search, X, Trash2, Edit2, Eye, Save, ChevronLeft, ChevronRight, Filter, RefreshCw, Settings, Upload, GripVertical } from 'lucide-react';
 import './App.css';
 import { db } from './firebase';
@@ -9,9 +10,16 @@ import ProfilesView from './components/ProfilesView';
 import BindersView from './components/BindersView';
 import EditBinderCover from './components/EditBinderCover';
 import BinderView from './components/BinderView';
+import { AuthProvider } from './contexts/AuthContext.jsx';
+import ProtectedRoute from './components/Auth/ProtectedRoute.jsx';
+import LoginPage from './components/Auth/LoginPage.jsx';
+import RegisterPage from './components/Auth/RegisterPage.jsx';
+import ForgotPasswordPage from './components/Auth/ForgotPasswordPage.jsx';
+import UserMenu from './components/Auth/UserMenu.jsx';
 
+// ─── Dashboard (existing app) ─────────────────────────────────────────────────
 
-export default function PokemonBinderApp() {
+function Dashboard() {
   const [profiles, setProfiles] = useState([]);
   const [currentProfile, setCurrentProfile] = useState(null);
   const [view, setView] = useState('profiles');
@@ -51,7 +59,7 @@ export default function PokemonBinderApp() {
   useEffect(() => {
     const theme = BACKGROUND_THEMES[appSettings.backgroundTheme] || BACKGROUND_THEMES.default;
     const colors = theme.colors;
-    
+
     if (colors.length === 2) {
       document.body.style.background = `linear-gradient(135deg, ${colors[0]} 0%, ${colors[1]} 100%)`;
     } else if (colors.length === 3) {
@@ -106,9 +114,9 @@ export default function PokemonBinderApp() {
 
   const searchCards = async (query, filters = searchFilters, page = 1) => {
     if (!query.trim() && !filters.set && !filters.type && !filters.rarity && !filters.supertype && !filters.language) return;
-    
+
     const cacheKey = JSON.stringify({ query, filters, page });
-    
+
     // Check cache first for instant results
     if (searchCache[cacheKey]) {
       setSearchResults(searchCache[cacheKey].results);
@@ -120,26 +128,26 @@ export default function PokemonBinderApp() {
 
     setLoading(true);
     setSearchResults([]); // Clear old results immediately
-    
+
     try {
       let queryParams = [];
-      
+
       if (query.trim()) {
         queryParams.push(`name:${query}*`);
       }
-      
+
       if (filters.set) {
         queryParams.push(`set.id:${filters.set}`);
       }
-      
+
       if (filters.type) {
         queryParams.push(`types:${filters.type}`);
       }
-      
+
       if (filters.rarity) {
         queryParams.push(`rarity:"${filters.rarity}"`);
       }
-      
+
       if (filters.supertype) {
         queryParams.push(`supertype:${filters.supertype}`);
       }
@@ -150,21 +158,21 @@ export default function PokemonBinderApp() {
 
       const queryString = queryParams.join(' ');
       const headers = API_KEY ? { 'X-Api-Key': API_KEY } : {};
-      
+
       const pageSize = 10; // Reduced for faster response
-      
+
       const response = await fetch(
         `https://api.pokemontcg.io/v2/cards?q=${queryString}&page=${page}&pageSize=${pageSize}&orderBy=-set.releaseDate`,
         { headers }
       );
-      
+
       if (!response.ok) {
         throw new Error('Search failed');
       }
-      
+
       const data = await response.json();
       let results = data.data || [];
-      
+
       if (filters.language) {
         results = results.filter(card => {
           return true;
@@ -173,16 +181,16 @@ export default function PokemonBinderApp() {
 
       const totalCount = data.totalCount || results.length;
       const totalPages = Math.ceil(totalCount / pageSize);
-      
+
       // Cache the results
       setSearchCache(prev => ({ ...prev, [cacheKey]: { results, totalPages } }));
-      
+
       // Set results
       setSearchResults(results);
       setTotalSearchPages(totalPages);
       setSearchPage(page);
       setLoading(false);
-      
+
     } catch (error) {
       console.error('Error fetching cards:', error);
       setSearchResults([]);
@@ -200,7 +208,7 @@ export default function PokemonBinderApp() {
         binders: [],
         createdAt: new Date().toISOString()
       };
-      
+
       const docRef = await addDoc(collection(db, 'profiles'), newProfile);
       console.log('Profile created with ID:', docRef.id);
       setSyncing(false);
@@ -239,7 +247,7 @@ export default function PokemonBinderApp() {
         cards: Array(totalSlots).fill(null),
         createdAt: new Date().toISOString()
       };
-      
+
       const updatedBinders = [...(profile.binders || []), newBinder];
       await updateDoc(doc(db, 'profiles', profileId), {
         binders: updatedBinders
@@ -256,10 +264,10 @@ export default function PokemonBinderApp() {
     setSyncing(true);
     try {
       const profile = profiles.find(p => p.id === profileId);
-      const updatedBinders = profile.binders.map(b => 
+      const updatedBinders = profile.binders.map(b =>
         b.id === binderId ? { ...b, ...updates } : b
       );
-      
+
       await updateDoc(doc(db, 'profiles', profileId), {
         binders: updatedBinders
       });
@@ -276,7 +284,7 @@ export default function PokemonBinderApp() {
     try {
       const profile = profiles.find(p => p.id === profileId);
       const updatedBinders = profile.binders.filter(b => b.id !== binderId);
-      
+
       await updateDoc(doc(db, 'profiles', profileId), {
         binders: updatedBinders
       });
@@ -292,7 +300,7 @@ export default function PokemonBinderApp() {
     if (selectedCell !== null && selectedBinder) {
       const updatedCards = [...selectedBinder.cards];
       updatedCards[selectedCell] = card;
-      
+
       await updateBinder(currentProfile.id, selectedBinder.id, { cards: updatedCards });
       setSelectedBinder({ ...selectedBinder, cards: updatedCards });
       setSelectedCell(null);
@@ -308,7 +316,7 @@ export default function PokemonBinderApp() {
     if (selectedBinder) {
       const updatedCards = [...selectedBinder.cards];
       updatedCards[index] = null;
-      
+
       await updateBinder(currentProfile.id, selectedBinder.id, { cards: updatedCards });
       setSelectedBinder({ ...selectedBinder, cards: updatedCards });
     }
@@ -320,7 +328,7 @@ export default function PokemonBinderApp() {
       const temp = updatedCards[fromIndex];
       updatedCards[fromIndex] = updatedCards[toIndex];
       updatedCards[toIndex] = temp;
-      
+
       await updateBinder(currentProfile.id, selectedBinder.id, { cards: updatedCards });
       setSelectedBinder({ ...selectedBinder, cards: updatedCards });
     }
@@ -334,7 +342,7 @@ export default function PokemonBinderApp() {
             <Book size={40} style={{ marginRight: '15px' }} />
             PokeBinder
           </h1>
-          <p style={{ fontSize: '1.5rem' }}>Struggling bringing your binder everywhere you go? 
+          <p style={{ fontSize: '1.5rem' }}>Struggling bringing your binder everywhere you go?
             <br />Organize and showcase your Pokémon TCG collection here in PokéBinder!
             <br />
             <br />By: MrWack</p>
@@ -345,19 +353,21 @@ export default function PokemonBinderApp() {
                 <span style={{ fontSize: '0.9rem' }}>Syncing with Firebase...</span>
               </div>
             )}
-            <button 
-              className="btn btn-secondary" 
-              onClick={() => setShowSettings(!showSettings)}
-              style={{ marginLeft: 'auto' }}
-            >
-              <Settings size={20} />
-              Settings
-            </button>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowSettings(!showSettings)}
+              >
+                <Settings size={20} />
+                Settings
+              </button>
+              <UserMenu onOpenSettings={() => setShowSettings(true)} />
+            </div>
           </div>
         </div>
 
         {showSettings && (
-          <SettingsPanel 
+          <SettingsPanel
             settings={appSettings}
             onSave={saveAppSettings}
             onClose={() => setShowSettings(false)}
@@ -365,7 +375,7 @@ export default function PokemonBinderApp() {
         )}
 
         {view === 'profiles' && (
-          <ProfilesView 
+          <ProfilesView
             profiles={profiles}
             onCreateProfile={createProfile}
             onSelectProfile={(profile) => {
@@ -441,5 +451,51 @@ export default function PokemonBinderApp() {
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Root with Router + Auth ──────────────────────────────────────────────────
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+
+          {/* Protected routes */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/binders"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/binder/:id"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
