@@ -16,4 +16,4 @@ export const BACKGROUND_THEMES = {
   dark: { name: 'Dark Type', colors: ['#616161', '#212121'] },
 };
 
-export const API_KEY = '5eb9ebd1-cd93-4976-9b0d-ac887128845f';
+export const API_KEY = import.meta.env.VITE_POKEMON_TCG_API_KEY;
