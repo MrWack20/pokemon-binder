@@ -1,13 +1,12 @@
 import React from 'react';
 import { Edit2, ChevronLeft, ChevronRight, Filter, X, Search, Plus, GripVertical } from 'lucide-react';
 
-export default function BinderView({ 
-  binder, currentPage, onPageChange, onBack, onEditCover, selectedCell, onSelectCell, 
+export default function BinderView({
+  binder, currentPage, onPageChange, onBack, onEditCover, selectedCell, onSelectCell,
   onRemoveCard, searchQuery, onSearchChange, onSearch, searchResults, loading, onAddCard,
-  searchFilters, onFilterChange, sets, showFilters, onToggleFilters, searchPage, totalSearchPages, 
-  onSearchPageChange, draggedCard, onDragStart, onDragEnd, onSwapCards 
+  searchFilters, onFilterChange, sets, showFilters, onToggleFilters, searchPage, totalSearchPages,
+  onSearchPageChange, draggedCard, onDragStart, onDragEnd, onSwapCards
 }) {
-  
   const slotsPerPage = binder.rows * binder.cols;
   const startIndex = currentPage * slotsPerPage;
   const endIndex = startIndex + slotsPerPage;
@@ -15,17 +14,13 @@ export default function BinderView({
   const totalPages = binder.pages;
   const filledCards = binder.cards.filter(c => c).length;
 
-  const handleSearch = () => {
-    onSearch(searchQuery, searchFilters, 1);
-  };
+  const handleSearch = () => onSearch(searchQuery, searchFilters, 1);
 
-  const clearFilters = () => {
-    onFilterChange({ set: '', type: '', rarity: '', supertype: '', language: '' });
-  };
+  const clearFilters = () => onFilterChange({ set: '', type: '', rarity: '', supertype: '', language: '' });
 
-  const handleDragStart = (e, index) => {
+  const handleDragStart = (e, pageIndex) => {
     e.dataTransfer.effectAllowed = 'move';
-    onDragStart(startIndex + index);
+    onDragStart(startIndex + pageIndex);
   };
 
   const handleDragOver = (e) => {
@@ -33,9 +28,9 @@ export default function BinderView({
     e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDrop = (e, toIndex) => {
+  const handleDrop = (e, pageIndex) => {
     e.preventDefault();
-    const absoluteToIndex = startIndex + toIndex;
+    const absoluteToIndex = startIndex + pageIndex;
     if (draggedCard !== null && draggedCard !== absoluteToIndex) {
       onSwapCards(draggedCard, absoluteToIndex);
     }
@@ -49,7 +44,7 @@ export default function BinderView({
           <button onClick={onBack} className="back-button">← Back to Binders</button>
           <h2>{binder.name}</h2>
           <p className="text-muted" style={{ marginTop: '5px' }}>
-            Page {currentPage + 1} of {totalPages} • {filledCards}/{binder.cards.length} cards filled
+            Page {currentPage + 1} of {totalPages} · {filledCards}/{binder.cards.length} cards filled
           </p>
         </div>
         <button className="btn btn-primary" onClick={onEditCover}>
@@ -59,24 +54,12 @@ export default function BinderView({
       </div>
 
       <div className="pagination">
-        <button 
-          className="btn btn-secondary" 
-          onClick={() => onPageChange(Math.max(0, currentPage - 1))}
-          disabled={currentPage === 0}
-        >
-          <ChevronLeft size={20} />
-          Previous
+        <button className="btn btn-secondary" onClick={() => onPageChange(Math.max(0, currentPage - 1))} disabled={currentPage === 0}>
+          <ChevronLeft size={20} />Previous
         </button>
-        <span className="page-indicator">
-          Page {currentPage + 1} / {totalPages}
-        </span>
-        <button 
-          className="btn btn-secondary" 
-          onClick={() => onPageChange(Math.min(totalPages - 1, currentPage + 1))}
-          disabled={currentPage === totalPages - 1}
-        >
-          Next
-          <ChevronRight size={20} />
+        <span className="page-indicator">Page {currentPage + 1} / {totalPages}</span>
+        <button className="btn btn-secondary" onClick={() => onPageChange(Math.min(totalPages - 1, currentPage + 1))} disabled={currentPage === totalPages - 1}>
+          Next<ChevronRight size={20} />
         </button>
       </div>
 
@@ -86,8 +69,7 @@ export default function BinderView({
             <h3>Search Pokemon Cards</h3>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => onToggleFilters(!showFilters)} className="btn btn-secondary">
-                <Filter size={20} />
-                {showFilters ? 'Hide' : 'Show'} Filters
+                <Filter size={20} />{showFilters ? 'Hide' : 'Show'} Filters
               </button>
               <button onClick={() => onSelectCell(null)} className="btn btn-secondary">
                 <X size={20} />
@@ -105,8 +87,7 @@ export default function BinderView({
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
             />
             <button onClick={handleSearch} className="btn btn-info">
-              <Search size={20} />
-              Search
+              <Search size={20} />Search
             </button>
           </div>
 
@@ -115,24 +96,14 @@ export default function BinderView({
               <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
                 <div className="form-group">
                   <label>Set</label>
-                  <select
-                    value={searchFilters.set}
-                    onChange={(e) => onFilterChange({ ...searchFilters, set: e.target.value })}
-                    className="input"
-                  >
+                  <select value={searchFilters.set} onChange={(e) => onFilterChange({ ...searchFilters, set: e.target.value })} className="input">
                     <option value="">All Sets</option>
-                    {sets.map(set => (
-                      <option key={set.id} value={set.id}>{set.name}</option>
-                    ))}
+                    {sets.map(set => <option key={set.id} value={set.id}>{set.name}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
                   <label>Type</label>
-                  <select
-                    value={searchFilters.type}
-                    onChange={(e) => onFilterChange({ ...searchFilters, type: e.target.value })}
-                    className="input"
-                  >
+                  <select value={searchFilters.type} onChange={(e) => onFilterChange({ ...searchFilters, type: e.target.value })} className="input">
                     <option value="">All Types</option>
                     <option value="Colorless">Colorless</option>
                     <option value="Darkness">Darkness</option>
@@ -151,11 +122,7 @@ export default function BinderView({
               <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
                 <div className="form-group">
                   <label>Supertype</label>
-                  <select
-                    value={searchFilters.supertype}
-                    onChange={(e) => onFilterChange({ ...searchFilters, supertype: e.target.value })}
-                    className="input"
-                  >
+                  <select value={searchFilters.supertype} onChange={(e) => onFilterChange({ ...searchFilters, supertype: e.target.value })} className="input">
                     <option value="">All Supertypes</option>
                     <option value="Pokémon">Pokémon</option>
                     <option value="Trainer">Trainer</option>
@@ -164,11 +131,7 @@ export default function BinderView({
                 </div>
                 <div className="form-group">
                   <label>Rarity</label>
-                  <select
-                    value={searchFilters.rarity}
-                    onChange={(e) => onFilterChange({ ...searchFilters, rarity: e.target.value })}
-                    className="input"
-                  >
+                  <select value={searchFilters.rarity} onChange={(e) => onFilterChange({ ...searchFilters, rarity: e.target.value })} className="input">
                     <option value="">All Rarities</option>
                     <option value="Common">Common</option>
                     <option value="Uncommon">Uncommon</option>
@@ -181,11 +144,7 @@ export default function BinderView({
               </div>
               <div className="form-group">
                 <label>Language (Note: API has limited language filtering)</label>
-                <select
-                  value={searchFilters.language}
-                  onChange={(e) => onFilterChange({ ...searchFilters, language: e.target.value })}
-                  className="input"
-                >
+                <select value={searchFilters.language} onChange={(e) => onFilterChange({ ...searchFilters, language: e.target.value })} className="input">
                   <option value="">All Languages</option>
                   <option value="en">English</option>
                   <option value="ja">Japanese</option>
@@ -203,72 +162,40 @@ export default function BinderView({
               </button>
             </div>
           )}
-          
-        {loading && (
-            <div style={{ 
-                textAlign: 'center', 
-                padding: '40px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '15px'
-            }}>
-                <div style={{
-                width: '50px',
-                height: '50px',
-                border: '4px solid #4a5568',
-                borderTop: '4px solid #3b82f6',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite'
-                }}></div>
-                <p style={{ color: '#9ca3af', fontSize: '1rem' }}>
-                Searching Pokemon cards...
-                </p>
+
+          {loading && (
+            <div style={{ textAlign: 'center', padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+              <div style={{ width: '50px', height: '50px', border: '4px solid #4a5568', borderTop: '4px solid #3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              <p style={{ color: '#9ca3af', fontSize: '1rem' }}>Searching Pokemon cards...</p>
             </div>
-        )}
+          )}
 
           {!loading && searchResults.length === 0 && (searchQuery || searchFilters.set || searchFilters.type || searchFilters.rarity || searchFilters.supertype || searchFilters.language) && (
             <p style={{ textAlign: 'center', padding: '20px', opacity: 0.7 }}>No cards found. Try different search terms or filters.</p>
           )}
-          
-            <div className="card-results">
+
+          {/* Search results still use TCG API card format */}
+          <div className="card-results">
             {searchResults.map(card => (
-                <div key={card.id} onClick={() => onAddCard(card)} className="search-card">
-                <img 
-                    src={card.images.small} 
-                    alt={card.name} 
-                    loading="lazy"
-                    style={{ imageRendering: 'auto' }}
-                />
+              <div key={card.id} onClick={() => onAddCard(card)} className="search-card">
+                <img src={card.images.small} alt={card.name} loading="lazy" style={{ imageRendering: 'auto' }} />
                 <p>{card.name}</p>
                 <p className="text-muted" style={{ fontSize: '0.75rem' }}>{card.set.name}</p>
                 {card.cardmarket?.prices?.averageSellPrice && (
-                    <p className="price">€{card.cardmarket.prices.averageSellPrice.toFixed(2)}</p>
+                  <p className="price">€{card.cardmarket.prices.averageSellPrice.toFixed(2)}</p>
                 )}
-                </div>
+              </div>
             ))}
-            </div>
+          </div>
 
           {totalSearchPages > 1 && (
             <div className="pagination" style={{ marginTop: '20px' }}>
-              <button 
-                className="btn btn-secondary" 
-                onClick={() => onSearchPageChange(Math.max(1, searchPage - 1))}
-                disabled={searchPage === 1}
-              >
-                <ChevronLeft size={20} />
-                Previous
+              <button className="btn btn-secondary" onClick={() => onSearchPageChange(Math.max(1, searchPage - 1))} disabled={searchPage === 1}>
+                <ChevronLeft size={20} />Previous
               </button>
-              <span className="page-indicator">
-                Page {searchPage} / {totalSearchPages}
-              </span>
-              <button 
-                className="btn btn-secondary" 
-                onClick={() => onSearchPageChange(Math.min(totalSearchPages, searchPage + 1))}
-                disabled={searchPage === totalSearchPages}
-              >
-                Next
-                <ChevronRight size={20} />
+              <span className="page-indicator">Page {searchPage} / {totalSearchPages}</span>
+              <button className="btn btn-secondary" onClick={() => onSearchPageChange(Math.min(totalSearchPages, searchPage + 1))} disabled={searchPage === totalSearchPages}>
+                Next<ChevronRight size={20} />
               </button>
             </div>
           )}
@@ -276,12 +203,9 @@ export default function BinderView({
       )}
 
       <div className="card">
-        <div 
+        <div
           className="binder-grid"
-          style={{ 
-            gridTemplateColumns: `repeat(${binder.cols}, 1fr)`,
-            gridTemplateRows: `repeat(${binder.rows}, 1fr)`
-          }}
+          style={{ gridTemplateColumns: `repeat(${binder.cols}, 1fr)`, gridTemplateRows: `repeat(${binder.rows}, 1fr)` }}
         >
           {currentPageCards.map((card, pageIndex) => {
             const absoluteIndex = startIndex + pageIndex;
@@ -299,19 +223,17 @@ export default function BinderView({
                 {card ? (
                   <div className="card-container">
                     <GripVertical size={16} className="drag-handle" />
-                    <img src={card.images.small} alt={card.name} loading="lazy" />
+                    {/* Binder grid cards use DB row fields */}
+                    <img src={card.card_image_url} alt={card.card_name} loading="lazy" />
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRemoveCard(absoluteIndex);
-                      }}
+                      onClick={(e) => { e.stopPropagation(); onRemoveCard(absoluteIndex); }}
                       className="remove-btn"
                     >
                       <X size={16} />
                     </button>
-                    {card.cardmarket?.prices?.averageSellPrice && (
+                    {card.card_price && (
                       <div className="card-price">
-                        €{card.cardmarket.prices.averageSellPrice.toFixed(2)}
+                        €{Number(card.card_price).toFixed(2)}
                       </div>
                     )}
                   </div>

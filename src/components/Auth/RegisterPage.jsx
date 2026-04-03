@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Book, Mail, Lock, UserPlus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { signInWithGoogle } from '../../services/supabaseAuth.js';
 
 export default function RegisterPage() {
   const { signUp } = useAuth();
-  const navigate = useNavigate();
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -18,43 +16,26 @@ export default function RegisterPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
-    setSuccess('');
-
-    if (password !== confirm) {
-      setError('Passwords do not match.');
-      return;
-    }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
-
+    if (password !== confirm) { setError('Passwords do not match.'); return; }
+    if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
     setLoading(true);
-    const { error: signUpError } = await signUp(email, password);
+    const { error: err } = await signUp(email, password);
     setLoading(false);
-
-    if (signUpError) {
-      setError(signUpError.message);
-    } else {
-      setSuccess('Account created! Check your email to confirm your address, then sign in.');
-    }
+    if (err) setError(err.message);
+    else setSuccess('Account created! Check your email to confirm, then sign in.');
   }
 
-  async function handleGoogleSignUp() {
-    setError('');
-    const { error: oauthError } = await signInWithGoogle();
-    if (oauthError) setError(oauthError.message);
+  async function handleGoogle() {
+    const { error: err } = await signInWithGoogle();
+    if (err) setError(err.message);
   }
 
   return (
     <div className="app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: '440px' }}>
-
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-            <Book size={40} />
-            <h1 style={{ fontSize: '2rem', margin: 0 }}>PokeBinder</h1>
+            <Book size={40} /><h1 style={{ fontSize: '2rem', margin: 0 }}>PokeBinder</h1>
           </div>
           <p style={{ opacity: 0.7 }}>Create your free account</p>
         </div>
@@ -62,108 +43,43 @@ export default function RegisterPage() {
         <div className="card">
           <h2 style={{ marginBottom: '24px', textAlign: 'center' }}>Get started</h2>
 
-          {error && (
-            <div style={{
-              background: 'rgba(239, 68, 68, 0.2)',
-              border: '1px solid rgba(239, 68, 68, 0.5)',
-              borderRadius: '10px',
-              padding: '12px 16px',
-              marginBottom: '20px',
-              fontSize: '0.95rem',
-            }}>
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div style={{
-              background: 'rgba(16, 185, 129, 0.2)',
-              border: '1px solid rgba(16, 185, 129, 0.5)',
-              borderRadius: '10px',
-              padding: '12px 16px',
-              marginBottom: '20px',
-              fontSize: '0.95rem',
-            }}>
-              {success}
-            </div>
-          )}
-
-          {!success && (
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>Email</label>
-                <div style={{ position: 'relative' }}>
-                  <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }} />
-                  <input
-                    type="email"
-                    className="input"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    required
-                    style={{ paddingLeft: '40px' }}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Password</label>
-                <div style={{ position: 'relative' }}>
-                  <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }} />
-                  <input
-                    type="password"
-                    className="input"
-                    placeholder="Min. 6 characters"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    required
-                    style={{ paddingLeft: '40px' }}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Confirm password</label>
-                <div style={{ position: 'relative' }}>
-                  <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }} />
-                  <input
-                    type="password"
-                    className="input"
-                    placeholder="Repeat password"
-                    value={confirm}
-                    onChange={e => setConfirm(e.target.value)}
-                    required
-                    style={{ paddingLeft: '40px' }}
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={loading}
-                style={{ width: '100%', justifyContent: 'center', marginBottom: '12px' }}
-              >
-                <UserPlus size={18} />
-                {loading ? 'Creating account…' : 'Create account'}
-              </button>
-            </form>
-          )}
+          {error && <div style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.5)', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px' }}>{error}</div>}
+          {success && <div style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.5)', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px' }}>{success}</div>}
 
           {!success && (
             <>
+              <form onSubmit={handleSubmit}>
+                <div className="form-group">
+                  <label>Email</label>
+                  <div style={{ position: 'relative' }}>
+                    <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }} />
+                    <input type="email" className="input" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} required style={{ paddingLeft: '40px' }} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }} />
+                    <input type="password" className="input" placeholder="Min. 6 characters" value={password} onChange={e => setPassword(e.target.value)} required style={{ paddingLeft: '40px' }} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Confirm password</label>
+                  <div style={{ position: 'relative' }}>
+                    <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }} />
+                    <input type="password" className="input" placeholder="Repeat password" value={confirm} onChange={e => setConfirm(e.target.value)} required style={{ paddingLeft: '40px' }} />
+                  </div>
+                </div>
+                <button type="submit" className="btn btn-primary" disabled={loading} style={{ width: '100%', justifyContent: 'center', marginBottom: '12px' }}>
+                  <UserPlus size={18} />{loading ? 'Creating account…' : 'Create account'}
+                </button>
+              </form>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '8px 0 16px' }}>
                 <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.2)' }} />
                 <span style={{ opacity: 0.5, fontSize: '0.85rem' }}>or</span>
                 <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.2)' }} />
               </div>
-
-              <button
-                type="button"
-                onClick={handleGoogleSignUp}
-                className="btn btn-secondary"
-                style={{ width: '100%', justifyContent: 'center' }}
-              >
+              <button type="button" onClick={handleGoogle} className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                   <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
                   <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
@@ -176,21 +92,15 @@ export default function RegisterPage() {
           )}
 
           {success && (
-            <div style={{ textAlign: 'center', marginTop: '8px' }}>
-              <Link to="/login">
-                <button className="btn btn-primary" style={{ justifyContent: 'center' }}>
-                  Go to sign in
-                </button>
-              </Link>
+            <div style={{ textAlign: 'center' }}>
+              <Link to="/login"><button className="btn btn-primary" style={{ justifyContent: 'center' }}>Go to sign in</button></Link>
             </div>
           )}
         </div>
 
         <p style={{ textAlign: 'center', marginTop: '24px', opacity: 0.7 }}>
           Already have an account?{' '}
-          <Link to="/login" style={{ color: '#fbbf24', fontWeight: 600 }}>
-            Sign in
-          </Link>
+          <Link to="/login" style={{ color: '#fbbf24', fontWeight: 600 }}>Sign in</Link>
         </p>
       </div>
     </div>
