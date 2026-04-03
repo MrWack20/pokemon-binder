@@ -242,17 +242,24 @@ function Dashboard() {
    * Maps API fields → binder_cards DB columns.
    */
   const handleAddCard = async (apiCard) => {
-    if (selectedCell === null || !selectedBinder) return;
+    if (selectedCell === null || !selectedBinder) {
+      console.warn('handleAddCard: selectedCell=', selectedCell, 'selectedBinder=', selectedBinder);
+      return;
+    }
     const { data, error } = await addCard(selectedBinder.id, selectedCell, {
       card_api_id: apiCard.id,
       card_name: apiCard.name,
-      card_image_url: apiCard.images.small,
+      card_image_url: apiCard.images?.small ?? apiCard.images?.large ?? '',
       card_set: apiCard.set?.name ?? null,
       card_game: 'pokemon',
       card_price: apiCard.cardmarket?.prices?.averageSellPrice ?? null,
       card_price_currency: 'EUR',
     });
-    if (error || !data) { alert('Failed to add card.'); return; }
+    if (error || !data) {
+      console.error('addCard error:', error);
+      alert(`Failed to add card: ${error?.message ?? 'no data returned'}`);
+      return;
+    }
 
     const updatedCards = [...selectedBinder.cards];
     updatedCards[selectedCell] = data;

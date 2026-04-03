@@ -10,15 +10,21 @@ export async function getBinderCards(binderId) {
 }
 
 /**
- * Add (or replace) a card at a specific slot. Uses upsert on (binder_id, slot_index).
+ * Add (or replace) a card at a specific slot.
+ * Deletes any existing card in that slot first, then inserts the new one.
+ * This avoids upsert RLS edge-cases where the UPDATE path can silently return null.
  */
 export async function addCard(binderId, slotIndex, cardData) {
+  // Remove any card already in this slot (ignore error if row doesn't exist)
+  await supabase
+    .from('binder_cards')
+    .delete()
+    .eq('binder_id', binderId)
+    .eq('slot_index', slotIndex);
+
   const { data, error } = await supabase
     .from('binder_cards')
-    .upsert(
-      { binder_id: binderId, slot_index: slotIndex, ...cardData },
-      { onConflict: 'binder_id,slot_index' }
-    )
+    .insert({ binder_id: binderId, slot_index: slotIndex, ...cardData })
     .select()
     .single();
   return { data, error };
