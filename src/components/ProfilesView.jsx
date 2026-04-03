@@ -8,7 +8,7 @@ import { updateProfile } from '../services/profileService.js';
  * In the Supabase model each user has exactly one profile (created on sign-up).
  */
 export default function ProfilesView() {
-  const { profile, user } = useAuth();
+  const { profile, setProfile, user } = useAuth();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(profile?.name ?? '');
   const [saving, setSaving] = useState(false);
@@ -16,7 +16,8 @@ export default function ProfilesView() {
   const handleSave = async () => {
     if (!name.trim() || !profile) return;
     setSaving(true);
-    await updateProfile(profile.id, { name: name.trim() });
+    const { data } = await updateProfile(profile.id, { name: name.trim() });
+    if (data) setProfile(data);
     setSaving(false);
     setEditing(false);
   };
