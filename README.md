@@ -1,21 +1,23 @@
 # PokeBinder
 
-A web app for organizing and showcasing your Pokemon TCG collection digitally — so you never have to lug your physical binder around again.
+A web app for organizing and showcasing your Pokémon TCG collection digitally — so you never have to lug your physical binder around again.
 
 Built by MrWack.
+
+**Live app:** deployed on Vercel
 
 ---
 
 ## Features
 
-- **Multi-profile support** — create separate profiles for different collectors
-- **Custom binders** — configure binder size (rows, columns, pages) per binder
-- **Card search** — search the full Pokemon TCG catalog via the Pokemon TCG API
-- **Advanced filters** — filter by set, type, rarity, supertype, and language
-- **Drag & drop** — rearrange cards within a binder by dragging
-- **Real-time sync** — data synced to Firebase Firestore with localStorage fallback
-- **Background themes** — customizable app background themes via Settings
-- **Binder cover editing** — customize the name and appearance of each binder
+- **Auth** — email/password sign-up & login, Google OAuth, password reset via email
+- **Custom binders** — configure rows, columns, and pages per binder; custom cover color, text, and image
+- **Card search** — search the full Pokémon TCG catalog via the Pokémon TCG API with set, type, rarity, and supertype filters
+- **Drag & drop** — rearrange cards within a binder (pointer + touch support)
+- **Card prices** — displays cardmarket average sell price (EUR) on each card
+- **Background themes** — customizable app background via Settings
+- **Cloud sync** — all data synced to Supabase Postgres (per-user, RLS enforced)
+- **Cover images** — upload a cover photo stored in Supabase Storage
 
 ---
 
@@ -23,11 +25,14 @@ Built by MrWack.
 
 | Layer | Technology |
 |---|---|
-| Framework | React 19 |
-| Build tool | Vite 7 |
-| Database | Firebase Firestore (migrating to Supabase) |
-| Card data | [Pokemon TCG API](https://pokemontcg.io/) |
+| Framework | React 19 + Vite 7 |
+| Auth & Database | Supabase (Postgres + Auth + Storage) |
+| Drag & Drop | @dnd-kit/core |
+| Toasts | react-hot-toast |
+| Card data | Pokémon TCG API |
 | Icons | Lucide React |
+| Routing | React Router DOM v7 |
+| Deployment | Vercel |
 
 ---
 
@@ -41,36 +46,33 @@ cd pokemon-binder
 # 2. Install dependencies
 npm install
 
-# 3. Create a .env file in the project root
+# 3. Create a .env file
 cp .env.example .env
-# Fill in your Firebase config and Pokemon TCG API key
-
-# 4. Start the dev server
-npm run dev
+# Fill in your Supabase URL, anon key, and Pokemon TCG API key
 ```
 
 ### Environment variables
 
-Create a `.env` file with the following:
-
 ```
-VITE_FIREBASE_API_KEY=your_firebase_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_POKEMON_TCG_API_KEY=your_pokemon_tcg_api_key
+```
+
+### Supabase setup
+
+1. Apply the schema: run `supabase/migrations/001_initial_schema.sql` in the Supabase SQL Editor
+2. Create a public storage bucket named `binder-covers` (Storage → New bucket)
+3. Enable Google OAuth in Supabase Auth settings (if using Google sign-in)
+
+### Dev server
+
+```bash
+npm run dev
 ```
 
 ---
 
 ## Project Status
 
-**Under active development.** Core binder and card management features are functional. The project is currently being expanded with authentication, Supabase migration, and additional features. See the roadmap below.
-
----
-
-## Roadmap
-
-See [ROADMAP_v2.md](./ROADMAP_v2.md) for the full planned feature roadmap.
+Core features complete. See [ROADMAP.md](./ROADMAP.md) for upcoming phases.

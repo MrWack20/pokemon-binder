@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Book, RefreshCw, Settings } from 'lucide-react';
+import toast from 'react-hot-toast';
 import './App.css';
 import { supabase } from './supabase.js';
 import { BACKGROUND_THEMES } from './constants/themes';
@@ -99,9 +100,6 @@ function Dashboard() {
   const [showSettings, setShowSettings] = useState(false);
   const [appSettings, setAppSettings] = useState({ backgroundTheme: 'default' });
 
-  // ── Drag state ───────────────────────────────────────────────────────────
-  const [draggedCard, setDraggedCard] = useState(null);
-
   // ── Bootstrap ────────────────────────────────────────────────────────────
   useEffect(() => {
     loadSetsData();
@@ -165,7 +163,7 @@ function Dashboard() {
       setSearchResults([]);
       setTotalSearchPages(0);
       setLoading(false);
-      alert('Search failed. Please try again with different filters.');
+      toast.error('Search failed. Try different terms or filters.');
       return;
     }
     setSearchCache(prev => ({ ...prev, [cacheKey]: data }));
@@ -187,7 +185,7 @@ function Dashboard() {
       cover_text: binderData.coverText || null,
     });
     if (error || !data) {
-      alert('Failed to create binder.');
+      toast.error('Failed to create binder.');
       setSyncing(false);
       return;
     }
@@ -203,13 +201,14 @@ function Dashboard() {
       ...prev,
       { ...data, cards: Array(data.rows * data.cols * data.pages).fill(null) },
     ]);
+    toast.success(`Binder "${data.name}" created!`);
     setSyncing(false);
   };
 
   const handleUpdateBinder = async (binderId, updates) => {
     setSyncing(true);
     const { data, error } = await updateBinderSvc(binderId, updates);
-    if (error) { alert('Failed to update binder.'); setSyncing(false); return; }
+    if (error) { toast.error('Failed to update binder.'); setSyncing(false); return; }
     setBinders(prev => prev.map(b => b.id === binderId ? { ...b, ...data } : b));
     if (selectedBinder?.id === binderId) {
       setSelectedBinder(prev => ({ ...prev, ...data }));
@@ -220,8 +219,9 @@ function Dashboard() {
   const handleDeleteBinder = async (binderId) => {
     setSyncing(true);
     const { error } = await deleteBinderSvc(binderId);
-    if (error) { alert('Failed to delete binder.'); setSyncing(false); return; }
+    if (error) { toast.error('Failed to delete binder.'); setSyncing(false); return; }
     setBinders(prev => prev.filter(b => b.id !== binderId));
+    toast.success('Binder deleted.');
     setSyncing(false);
   };
 
@@ -229,7 +229,7 @@ function Dashboard() {
   const handleSelectBinder = async (binder) => {
     setSyncing(true);
     const { data: cardRows, error } = await getBinderCards(binder.id);
-    if (error) { alert('Failed to load binder.'); setSyncing(false); return; }
+    if (error) { toast.error('Failed to load binder.'); setSyncing(false); return; }
     const cards = buildCardsArray(binder.rows, binder.cols, binder.pages, cardRows);
     setSelectedBinder({ ...binder, cards });
     setCurrentPage(0);
@@ -259,7 +259,7 @@ function Dashboard() {
     });
     if (error || !data) {
       console.error('addCard error:', error);
-      alert(`Failed to add card: ${error?.message ?? 'no data returned'}`);
+      toast.error(`Failed to add card: ${error?.message ?? 'unknown error'}`);
       return;
     }
 
@@ -272,6 +272,7 @@ function Dashboard() {
     setSearchFilters({ set: '', type: '', rarity: '', supertype: '', language: '' });
     setSearchPage(1);
     setTotalSearchPages(0);
+    toast.success(`${data.card_name} added!`);
   };
 
   /** Remove a card by its slot index. Uses the DB row id stored in the slot. */
@@ -280,7 +281,7 @@ function Dashboard() {
     const card = selectedBinder.cards[slotIndex];
     if (!card) return;
     const { error } = await removeCard(card.id);
-    if (error) { alert('Failed to remove card.'); return; }
+    if (error) { toast.error('Failed to remove card.'); return; }
     const updatedCards = [...selectedBinder.cards];
     updatedCards[slotIndex] = null;
     setSelectedBinder({ ...selectedBinder, cards: updatedCards });
@@ -300,7 +301,7 @@ function Dashboard() {
       ? await swapCardsSvc(fromCard.id, toCard.id)
       : await moveCard(fromCard.id, toIndex);
 
-    if (error) { alert('Failed to move card.'); return; }
+    if (error) { toast.error('Failed to move card.'); return; }
 
     const updatedCards = [...selectedBinder.cards];
     updatedCards[fromIndex] = toCard ? { ...toCard, slot_index: fromIndex } : null;
@@ -332,7 +333,7 @@ function Dashboard() {
             <Book size={40} style={{ marginRight: '15px' }} />
             PokeBinder
           </h1>
-          <p style={{ fontSize: '1.5rem' }}>
+          <p className="header-subtitle">
             Struggling bringing your binder everywhere you go?
             <br />Organize and showcase your Pokémon TCG collection here in PokéBinder!
             <br /><br />By: MrWack
@@ -401,9 +402,6 @@ function Dashboard() {
             searchPage={searchPage}
             totalSearchPages={totalSearchPages}
             onSearchPageChange={(page) => handleSearch(searchQuery, searchFilters, page)}
-            draggedCard={draggedCard}
-            onDragStart={setDraggedCard}
-            onDragEnd={() => setDraggedCard(null)}
             onSwapCards={handleSwapCards}
           />
         )}

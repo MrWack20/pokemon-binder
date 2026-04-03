@@ -52,7 +52,7 @@ export default function EditBinderCover({ binder, onSave, onCancel }) {
         <h2>Edit Binder Cover</h2>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+      <div className="grid edit-cover-grid">
         {/* Settings panel */}
         <div className="card">
           <h3>Cover Settings</h3>

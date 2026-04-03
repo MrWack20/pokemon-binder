@@ -1,11 +1,76 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { Edit2, ChevronLeft, ChevronRight, Filter, X, Search, Plus, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
+
+// ─── Individual card slot (draggable + droppable) ────────────────────────────
+
+function CardSlot({ absoluteIndex, card, isSelected, onSelectCell, onRemoveCard, isDragActive }) {
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+    id: absoluteIndex,
+    disabled: !card,
+  });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: absoluteIndex });
+
+  const setRef = useCallback(
+    (node) => { setDragRef(node); setDropRef(node); },
+    [setDragRef, setDropRef],
+  );
+
+  return (
+    <div
+      ref={setRef}
+      {...(card ? attributes : {})}
+      {...(card ? listeners : {})}
+      onClick={() => !card && !isDragActive && onSelectCell(absoluteIndex)}
+      className={[
+        'card-slot',
+        card ? 'filled' : 'empty',
+        isSelected ? 'selected' : '',
+        isDragging ? 'dragging' : '',
+        isOver && !isDragging ? 'drag-over' : '',
+      ].filter(Boolean).join(' ')}
+      style={{ cursor: card ? (isDragging ? 'grabbing' : 'grab') : 'pointer', touchAction: 'none' }}
+    >
+      {card ? (
+        <div className="card-container">
+          <GripVertical size={16} className="drag-handle" />
+          <img src={card.card_image_url} alt={card.card_name} loading="lazy" />
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemoveCard(absoluteIndex); }}
+            className="remove-btn"
+            style={{ touchAction: 'auto' }}
+          >
+            <X size={16} />
+          </button>
+          {card.card_price && (
+            <div className="card-price">
+              €{Number(card.card_price).toFixed(2)}
+            </div>
+          )}
+        </div>
+      ) : (
+        <Plus size={32} style={{ opacity: 0.5 }} />
+      )}
+    </div>
+  );
+}
+
+// ─── BinderView ───────────────────────────────────────────────────────────────
 
 export default function BinderView({
   binder, currentPage, onPageChange, onBack, onEditCover, selectedCell, onSelectCell,
   onRemoveCard, searchQuery, onSearchChange, onSearch, searchResults, loading, onAddCard,
   searchFilters, onFilterChange, sets, showFilters, onToggleFilters, searchPage, totalSearchPages,
-  onSearchPageChange, draggedCard, onDragStart, onDragEnd, onSwapCards
+  onSearchPageChange, onSwapCards,
 }) {
   const slotsPerPage = binder.rows * binder.cols;
   const startIndex = currentPage * slotsPerPage;
@@ -14,28 +79,28 @@ export default function BinderView({
   const totalPages = binder.pages;
   const filledCards = binder.cards.filter(c => c).length;
 
+  // Track which card is being dragged for the DragOverlay
+  const [activeDragId, setActiveDragId] = useState(null);
+  const activeDragCard = activeDragId !== null ? binder.cards[activeDragId] : null;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  );
+
+  function handleDragStart({ active }) {
+    setActiveDragId(active.id);
+    onSelectCell(null); // close search panel if open
+  }
+
+  function handleDragEnd({ active, over }) {
+    setActiveDragId(null);
+    if (!over || active.id === over.id) return;
+    onSwapCards(active.id, over.id);
+  }
+
   const handleSearch = () => onSearch(searchQuery, searchFilters, 1);
-
   const clearFilters = () => onFilterChange({ set: '', type: '', rarity: '', supertype: '', language: '' });
-
-  const handleDragStart = (e, pageIndex) => {
-    e.dataTransfer.effectAllowed = 'move';
-    onDragStart(startIndex + pageIndex);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleDrop = (e, pageIndex) => {
-    e.preventDefault();
-    const absoluteToIndex = startIndex + pageIndex;
-    if (draggedCard !== null && draggedCard !== absoluteToIndex) {
-      onSwapCards(draggedCard, absoluteToIndex);
-    }
-    onDragEnd();
-  };
 
   return (
     <div>
@@ -66,7 +131,7 @@ export default function BinderView({
       {selectedCell !== null && (
         <div className="card" style={{ marginBottom: '30px' }}>
           <div className="section-header">
-            <h3>Search Pokemon Cards</h3>
+            <h3>Search Pokémon Cards</h3>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => onToggleFilters(!showFilters)} className="btn btn-secondary">
                 <Filter size={20} />{showFilters ? 'Hide' : 'Show'} Filters
@@ -93,7 +158,7 @@ export default function BinderView({
 
           {showFilters && (
             <div className="filters-panel">
-              <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              <div className="form-row">
                 <div className="form-group">
                   <label>Set</label>
                   <select value={searchFilters.set} onChange={(e) => onFilterChange({ ...searchFilters, set: e.target.value })} className="input">
@@ -119,7 +184,7 @@ export default function BinderView({
                   </select>
                 </div>
               </div>
-              <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              <div className="form-row">
                 <div className="form-group">
                   <label>Supertype</label>
                   <select value={searchFilters.supertype} onChange={(e) => onFilterChange({ ...searchFilters, supertype: e.target.value })} className="input">
@@ -151,19 +216,18 @@ export default function BinderView({
           {loading && (
             <div style={{ textAlign: 'center', padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
               <div style={{ width: '50px', height: '50px', border: '4px solid #4a5568', borderTop: '4px solid #3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-              <p style={{ color: '#9ca3af', fontSize: '1rem' }}>Searching Pokemon cards...</p>
+              <p style={{ color: '#9ca3af', fontSize: '1rem' }}>Searching Pokémon cards...</p>
             </div>
           )}
 
-          {!loading && searchResults.length === 0 && (searchQuery || searchFilters.set || searchFilters.type || searchFilters.rarity || searchFilters.supertype || searchFilters.language) && (
+          {!loading && searchResults.length === 0 && (searchQuery || searchFilters.set || searchFilters.type || searchFilters.rarity || searchFilters.supertype) && (
             <p style={{ textAlign: 'center', padding: '20px', opacity: 0.7 }}>No cards found. Try different search terms or filters.</p>
           )}
 
-          {/* Search results still use TCG API card format */}
           <div className="card-results">
             {searchResults.map(card => (
               <div key={card.id} onClick={() => onAddCard(card)} className="search-card">
-                <img src={card.images.small} alt={card.name} loading="lazy" style={{ imageRendering: 'auto' }} />
+                <img src={card.images.small} alt={card.name} loading="lazy" />
                 <p>{card.name}</p>
                 <p className="text-muted" style={{ fontSize: '0.75rem' }}>{card.set.name}</p>
                 {card.cardmarket?.prices?.averageSellPrice && (
@@ -188,47 +252,44 @@ export default function BinderView({
       )}
 
       <div className="card">
-        <div
-          className="binder-grid"
-          style={{ gridTemplateColumns: `repeat(${binder.cols}, 1fr)`, gridTemplateRows: `repeat(${binder.rows}, 1fr)` }}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
         >
-          {currentPageCards.map((card, pageIndex) => {
-            const absoluteIndex = startIndex + pageIndex;
-            return (
-              <div
-                key={absoluteIndex}
-                onClick={() => !card && onSelectCell(absoluteIndex)}
-                onDragStart={(e) => card && handleDragStart(e, pageIndex)}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, pageIndex)}
-                draggable={!!card}
-                className={`card-slot ${selectedCell === absoluteIndex ? 'selected' : ''} ${card ? 'filled' : 'empty'} ${draggedCard === absoluteIndex ? 'dragging' : ''}`}
-                style={{ cursor: card ? 'grab' : 'pointer' }}
-              >
-                {card ? (
-                  <div className="card-container">
-                    <GripVertical size={16} className="drag-handle" />
-                    {/* Binder grid cards use DB row fields */}
-                    <img src={card.card_image_url} alt={card.card_name} loading="lazy" />
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onRemoveCard(absoluteIndex); }}
-                      className="remove-btn"
-                    >
-                      <X size={16} />
-                    </button>
-                    {card.card_price && (
-                      <div className="card-price">
-                        €{Number(card.card_price).toFixed(2)}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <Plus size={32} style={{ opacity: 0.5 }} />
-                )}
+          <div
+            className="binder-grid"
+            style={{ gridTemplateColumns: `repeat(${binder.cols}, 1fr)`, gridTemplateRows: `repeat(${binder.rows}, 1fr)` }}
+          >
+            {currentPageCards.map((card, pageIndex) => {
+              const absoluteIndex = startIndex + pageIndex;
+              return (
+                <CardSlot
+                  key={absoluteIndex}
+                  absoluteIndex={absoluteIndex}
+                  card={card}
+                  isSelected={selectedCell === absoluteIndex}
+                  onSelectCell={onSelectCell}
+                  onRemoveCard={onRemoveCard}
+                  isDragActive={activeDragId !== null}
+                />
+              );
+            })}
+          </div>
+
+          <DragOverlay>
+            {activeDragCard ? (
+              <div style={{ width: '80px', opacity: 0.85, transform: 'rotate(3deg)', filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.5))' }}>
+                <img
+                  src={activeDragCard.card_image_url}
+                  alt={activeDragCard.card_name}
+                  style={{ width: '100%', borderRadius: '8px' }}
+                />
               </div>
-            );
-          })}
-        </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </div>
     </div>
   );

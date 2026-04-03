@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Eye } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function BindersView({ profile, binders, onCreateBinder, onSelectBinder, onDeleteBinder }) {
   const [showCreate, setShowCreate] = useState(false);
@@ -164,7 +165,23 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
                     View
                   </button>
                   <button
-                    onClick={() => confirm('Delete this binder?') && onDeleteBinder(binder.id)}
+                    onClick={() => {
+                      toast((t) => (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <span>Delete <strong>{binder.name}</strong>? This cannot be undone.</span>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => { toast.dismiss(t.id); onDeleteBinder(binder.id); }}
+                              style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontWeight: 600 }}
+                            >Delete</button>
+                            <button
+                              onClick={() => toast.dismiss(t.id)}
+                              style={{ background: '#6b7280', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontWeight: 600 }}
+                            >Cancel</button>
+                          </div>
+                        </div>
+                      ), { duration: Infinity });
+                    }}
                     className="btn btn-danger"
                   >
                     <Trash2 size={20} />
