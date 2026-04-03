@@ -51,7 +51,7 @@ export default function ProfilesView() {
                 onChange={(e) => setName(e.target.value)}
                 className="input"
                 autoFocus
-                onKeyPress={(e) => e.key === 'Enter' && handleSave()}
+                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
               />
             </div>
             <div className="button-group">

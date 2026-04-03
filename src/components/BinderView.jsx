@@ -84,7 +84,7 @@ export default function BinderView({
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search by card name..."
               className="input"
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             />
             <button onClick={handleSearch} className="btn btn-info">
               <Search size={20} />Search
@@ -141,21 +141,6 @@ export default function BinderView({
                     <option value="Rare Secret">Rare Secret</option>
                   </select>
                 </div>
-              </div>
-              <div className="form-group">
-                <label>Language (Note: API has limited language filtering)</label>
-                <select value={searchFilters.language} onChange={(e) => onFilterChange({ ...searchFilters, language: e.target.value })} className="input">
-                  <option value="">All Languages</option>
-                  <option value="en">English</option>
-                  <option value="ja">Japanese</option>
-                  <option value="fr">French</option>
-                  <option value="de">German</option>
-                  <option value="es">Spanish</option>
-                  <option value="it">Italian</option>
-                  <option value="pt">Portuguese</option>
-                  <option value="ko">Korean</option>
-                  <option value="zh">Chinese</option>
-                </select>
               </div>
               <button onClick={clearFilters} className="btn btn-secondary" style={{ width: '100%' }}>
                 Clear All Filters

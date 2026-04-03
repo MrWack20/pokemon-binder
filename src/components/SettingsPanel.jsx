@@ -21,7 +21,7 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
   const [passwordMsg, setPasswordMsg] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const isOAuth = !user?.email?.includes('@') === false && user?.app_metadata?.provider !== 'email';
+  const isOAuth = user?.app_metadata?.provider !== 'email';
 
   async function handleSaveName() {
     if (!displayName.trim()) return;

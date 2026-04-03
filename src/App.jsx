@@ -13,6 +13,8 @@ import ProtectedRoute from './components/Auth/ProtectedRoute.jsx';
 import LoginPage from './components/Auth/LoginPage.jsx';
 import RegisterPage from './components/Auth/RegisterPage.jsx';
 import ForgotPasswordPage from './components/Auth/ForgotPasswordPage.jsx';
+import AuthCallbackPage from './components/Auth/AuthCallbackPage.jsx';
+import ResetPasswordPage from './components/Auth/ResetPasswordPage.jsx';
 import UserMenu from './components/Auth/UserMenu.jsx';
 import {
   getBinders,
@@ -428,6 +430,8 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
+          <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

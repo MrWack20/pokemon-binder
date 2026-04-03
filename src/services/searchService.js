@@ -13,17 +13,16 @@ function getHeaders() {
  */
 export async function searchCards(query, filters = {}, page = 1) {
   const hasQuery = query && query.trim();
-  const hasFilters = filters.set || filters.type || filters.rarity || filters.supertype || filters.language;
+  const hasFilters = filters.set || filters.type || filters.rarity || filters.supertype;
   if (!hasQuery && !hasFilters) return { data: { results: [], totalPages: 0 }, error: null };
 
   try {
     const queryParams = [];
-    if (hasQuery)        queryParams.push(`name:${query.trim()}*`);
-    if (filters.set)     queryParams.push(`set.id:${filters.set}`);
-    if (filters.type)    queryParams.push(`types:${filters.type}`);
-    if (filters.rarity)  queryParams.push(`rarity:"${filters.rarity}"`);
+    if (hasQuery)          queryParams.push(`name:${query.trim()}*`);
+    if (filters.set)       queryParams.push(`set.id:${filters.set}`);
+    if (filters.type)      queryParams.push(`types:${filters.type}`);
+    if (filters.rarity)    queryParams.push(`rarity:"${filters.rarity}"`);
     if (filters.supertype) queryParams.push(`supertype:${filters.supertype}`);
-    if (filters.language)  queryParams.push(`nationalPokedexNumbers:[1 TO 1025]`);
 
     const url = `${BASE_URL}/cards?q=${encodeURIComponent(queryParams.join(' '))}&page=${page}&pageSize=${PAGE_SIZE}&orderBy=-set.releaseDate`;
     const response = await fetch(url, { headers: getHeaders() });
