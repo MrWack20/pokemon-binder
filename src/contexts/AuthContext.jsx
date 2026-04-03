@@ -15,12 +15,21 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Safety net: if Supabase never fires (missing env vars, network error),
+    // stop the spinner after 8 seconds so the user at least reaches the login page.
+    const timeout = setTimeout(() => setLoading(false), 8000);
+
     const { data: { subscription } } = onAuthStateChange(async (event, session) => {
+      clearTimeout(timeout);
       const currentUser = session?.user ?? null;
       setUser(currentUser);
 
       if (currentUser) {
-        await ensureProfile(currentUser);
+        try {
+          await ensureProfile(currentUser);
+        } catch (err) {
+          console.error('ensureProfile failed:', err);
+        }
       } else {
         setProfile(null);
       }
@@ -28,7 +37,10 @@ export function AuthProvider({ children }) {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function ensureProfile(currentUser) {
