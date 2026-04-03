@@ -5,6 +5,7 @@ import {
   signOut as authSignOut,
   onAuthStateChange,
 } from '../services/supabaseAuth.js';
+import { supabase } from '../supabase.js';
 import { getProfile, createProfile } from '../services/profileService.js';
 
 const AuthContext = createContext(null);
@@ -15,30 +16,43 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Safety net: if Supabase never fires (missing env vars, network error),
-    // stop the spinner after 8 seconds so the user at least reaches the login page.
-    const timeout = setTimeout(() => setLoading(false), 8000);
+    let cancelled = false;
 
-    const { data: { subscription } } = onAuthStateChange(async (event, session) => {
-      clearTimeout(timeout);
+    // Bootstrap: read session from localStorage immediately (no network call if token is fresh).
+    // This is the fast path on page refresh — avoids waiting for onAuthStateChange to fire.
+    const fallback = setTimeout(() => { if (!cancelled) setLoading(false); }, 5000);
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (cancelled) return;
+      clearTimeout(fallback);
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-
       if (currentUser) {
-        try {
-          await ensureProfile(currentUser);
-        } catch (err) {
-          console.error('ensureProfile failed:', err);
-        }
+        try { await ensureProfile(currentUser); } catch (err) { console.error('ensureProfile:', err); }
       } else {
         setProfile(null);
       }
+      if (!cancelled) setLoading(false);
+    }).catch(() => {
+      if (!cancelled) setLoading(false);
+    });
 
-      setLoading(false);
+    // Subscribe to subsequent auth changes (sign in, sign out, token refresh).
+    // Skip INITIAL_SESSION — already handled by getSession() above.
+    const { data: { subscription } } = onAuthStateChange(async (event, session) => {
+      if (event === 'INITIAL_SESSION' || cancelled) return;
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        try { await ensureProfile(currentUser); } catch (err) { console.error('ensureProfile:', err); }
+      } else {
+        setProfile(null);
+      }
     });
 
     return () => {
-      clearTimeout(timeout);
+      cancelled = true;
+      clearTimeout(fallback);
       subscription.unsubscribe();
     };
   }, []);
