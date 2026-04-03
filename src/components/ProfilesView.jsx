@@ -1,59 +1,68 @@
 import React, { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Edit2, Save, X } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext.jsx';
+import { updateProfile } from '../services/profileService.js';
 
-export default function ProfilesView({ profiles, onCreateProfile, onSelectProfile, onDeleteProfile }) {
-  const [showCreate, setShowCreate] = useState(false);
-  const [newProfileName, setNewProfileName] = useState('');
+/**
+ * ProfilesView — shows the current user's profile and allows renaming it.
+ * In the Supabase model each user has exactly one profile (created on sign-up).
+ */
+export default function ProfilesView() {
+  const { profile, user } = useAuth();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(profile?.name ?? '');
+  const [saving, setSaving] = useState(false);
 
-  const handleCreate = async () => {
-    if (newProfileName.trim()) {
-      await onCreateProfile(newProfileName);
-      setNewProfileName('');
-      setShowCreate(false);
-    }
+  const handleSave = async () => {
+    if (!name.trim() || !profile) return;
+    setSaving(true);
+    await updateProfile(profile.id, { name: name.trim() });
+    setSaving(false);
+    setEditing(false);
   };
+
+  if (!profile) return null;
 
   return (
     <div>
       <div className="section-header">
-        <h2>Your Profiles</h2>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-          <Plus size={20} />
-          New Profile
-        </button>
+        <h2>Your Profile</h2>
       </div>
 
-      {showCreate && (
-        <div className="card" style={{ marginBottom: '30px' }}>
-          <h3>Create New Profile</h3>
-          <input
-            type="text"
-            value={newProfileName}
-            onChange={(e) => setNewProfileName(e.target.value)}
-            placeholder="Profile Name"
-            className="input"
-            onKeyPress={(e) => e.key === 'Enter' && handleCreate()}
-          />
-          <div className="button-group">
-            <button onClick={handleCreate} className="btn btn-success">Create</button>
-            <button onClick={() => setShowCreate(false)} className="btn btn-secondary">Cancel</button>
-          </div>
-        </div>
-      )}
-
-      <div className="grid">
-        {profiles.map(profile => (
-          <div key={profile.id} className="card">
+      <div className="card" style={{ maxWidth: '480px' }}>
+        {!editing ? (
+          <>
             <h3>{profile.name}</h3>
-            <p className="text-muted">{profile.binders?.length || 0} binder(s)</p>
+            <p className="text-muted">{user?.email}</p>
             <div className="button-group">
-              <button onClick={() => onSelectProfile(profile)} className="btn btn-info">Open</button>
-              <button onClick={() => confirm('Delete this profile?') && onDeleteProfile(profile.id)} className="btn btn-danger">
-                <Trash2 size={20} />
+              <button onClick={() => { setName(profile.name); setEditing(true); }} className="btn btn-secondary">
+                <Edit2 size={16} />Edit Name
               </button>
             </div>
-          </div>
-        ))}
+          </>
+        ) : (
+          <>
+            <div className="form-group">
+              <label>Display Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="input"
+                autoFocus
+                onKeyPress={(e) => e.key === 'Enter' && handleSave()}
+              />
+            </div>
+            <div className="button-group">
+              <button onClick={handleSave} className="btn btn-success" disabled={saving}>
+                <Save size={16} />{saving ? 'Saving…' : 'Save'}
+              </button>
+              <button onClick={() => setEditing(false)} className="btn btn-secondary">
+                <X size={16} />Cancel
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
