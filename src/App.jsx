@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Book, RefreshCw } from 'lucide-react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Book, RefreshCw, Layers, BarChart2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import './App.css';
 import { supabase } from './supabase.js';
@@ -78,6 +78,7 @@ function buildCardsArray(rows, cols, pages, cardRows) {
 
 function Dashboard() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
 
   // ── View state ──────────────────────────────────────────────────────────────
   const [view, setView] = useState('binders');
@@ -348,9 +349,21 @@ function Dashboard() {
               <UserMenu />
             </div>
           </div>
-          <p className="header-subtitle">
-            Organize and showcase your Pokémon TCG collection digitally.
-          </p>
+          {view === 'binders' && (
+            <div className="header-nav">
+              <p className="header-subtitle">
+                Organize and showcase your Pokémon TCG collection digitally.
+              </p>
+              <div className="header-nav__links">
+                <button className="header-nav__btn" onClick={() => navigate('/sets')}>
+                  <Layers size={16} />Browse Sets
+                </button>
+                <button className="header-nav__btn" onClick={() => navigate('/stats')}>
+                  <BarChart2 size={16} />Statistics
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {view === 'binders' && (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, X, ChevronLeft, ChevronRight, RefreshCw, Layers } from 'lucide-react';
-import { getSets, searchCards } from '../services/searchService.js';
+import { ArrowLeft, Search, X, RefreshCw, Layers, AlertCircle } from 'lucide-react';
+import { getSets, getSetCards } from '../services/searchService.js';
 import CardDetailModal from './CardDetailModal.jsx';
 
 function getStoredCurrency() {
@@ -16,16 +16,17 @@ export default function SetsPage() {
   const currency = getStoredCurrency();
   const symbol = CURRENCY_SYMBOL[currency] || '$';
 
+  // Set list state
   const [sets, setSets] = useState([]);
   const [loadingSets, setLoadingSets] = useState(true);
   const [nameFilter, setNameFilter] = useState('');
   const [seriesFilter, setSeriesFilter] = useState('');
+  const [language, setLanguage] = useState('english'); // 'english' | 'japanese'
 
+  // Card browsing state
   const [selectedSet, setSelectedSet] = useState(null);
   const [cards, setCards] = useState([]);
   const [loadingCards, setLoadingCards] = useState(false);
-  const [cardPage, setCardPage] = useState(1);
-  const [totalCardPages, setTotalCardPages] = useState(0);
   const [cardSort, setCardSort] = useState('number');
 
   const [modalCard, setModalCard] = useState(null);
@@ -56,30 +57,19 @@ export default function SetsPage() {
   async function openSet(set) {
     setSelectedSet(set);
     setCards([]);
-    setCardPage(1);
-    await fetchSetCards(set.id, 1, cardSort);
-  }
-
-  async function fetchSetCards(setId, page, sort) {
     setLoadingCards(true);
-    const { data } = await searchCards('', { set: setId }, page, sort);
-    if (data) {
-      setCards(data.results);
-      setTotalCardPages(data.totalPages);
-    }
+    const { data } = await getSetCards(set.id, cardSort);
+    setCards(data || []);
     setLoadingCards(false);
-  }
-
-  async function handleCardPageChange(page) {
-    setCardPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    await fetchSetCards(selectedSet.id, page, cardSort);
   }
 
   async function handleSortChange(sort) {
     setCardSort(sort);
-    setCardPage(1);
-    if (selectedSet) await fetchSetCards(selectedSet.id, 1, sort);
+    if (!selectedSet) return;
+    setLoadingCards(true);
+    const { data } = await getSetCards(selectedSet.id, sort);
+    setCards(data || []);
+    setLoadingCards(false);
   }
 
   function handleBack() {
@@ -102,8 +92,40 @@ export default function SetsPage() {
             <div style={{ width: '130px' }} />
           </div>
 
-          {/* ── Set list ─────────────────────────────────────────────────── */}
+          {/* ── Language toggle ─────────────────────────────────────────── */}
           {!selectedSet && (
+            <div className="sets-lang-toggle">
+              <button
+                className={`sets-lang-btn${language === 'english' ? ' active' : ''}`}
+                onClick={() => setLanguage('english')}
+              >
+                English TCG
+              </button>
+              <button
+                className={`sets-lang-btn${language === 'japanese' ? ' active' : ''}`}
+                onClick={() => setLanguage('japanese')}
+              >
+                Japanese TCG
+              </button>
+            </div>
+          )}
+
+          {/* ── Japanese placeholder ─────────────────────────────────────── */}
+          {!selectedSet && language === 'japanese' && (
+            <div className="sets-jp-notice">
+              <AlertCircle size={20} style={{ flexShrink: 0, color: '#fbbf24' }} />
+              <div>
+                <p style={{ fontWeight: 600, marginBottom: '4px' }}>Japanese sets coming soon</p>
+                <p style={{ opacity: 0.6, fontSize: '0.875rem' }}>
+                  The current data source (pokemontcg.io) only covers the English TCG.
+                  Japanese set integration requires a separate data source and is planned for a future update.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── English set list ─────────────────────────────────────────── */}
+          {!selectedSet && language === 'english' && (
             <>
               <div className="sets-controls">
                 <div className="sets-search-wrap">
@@ -164,7 +186,7 @@ export default function SetsPage() {
             </>
           )}
 
-          {/* ── Set detail: card browser ──────────────────────────────── */}
+          {/* ── Set detail: all cards ─────────────────────────────────────── */}
           {selectedSet && (
             <>
               <div className="set-detail-banner">
@@ -178,15 +200,17 @@ export default function SetsPage() {
                   </p>
                 </div>
                 <div className="set-detail-sort">
-                  <label style={{ fontSize: '0.8rem', opacity: 0.55 }}>Sort</label>
+                  <label style={{ fontSize: '0.8rem', opacity: 0.55, whiteSpace: 'nowrap' }}>Sort by</label>
                   <select
                     value={cardSort}
                     onChange={e => handleSortChange(e.target.value)}
                     className="input"
                     style={{ marginBottom: 0, fontSize: '0.85rem', padding: '6px 10px' }}
                   >
-                    <option value="number">Card Number</option>
-                    <option value="name">Name A–Z</option>
+                    <option value="number">Number 1 → 250</option>
+                    <option value="-number">Number 250 → 1</option>
+                    <option value="name">Name A → Z</option>
+                    <option value="-name">Name Z → A</option>
                     <option value="price_desc">Price: High → Low</option>
                     <option value="price_asc">Price: Low → High</option>
                   </select>
@@ -196,52 +220,28 @@ export default function SetsPage() {
               {loadingCards ? (
                 <div className="stats-loading">
                   <RefreshCw size={32} className="spinning" />
-                  <p>Loading cards…</p>
+                  <p>Loading {selectedSet.printedTotal ?? selectedSet.total} cards…</p>
                 </div>
               ) : (
-                <>
-                  <div className="sets-card-grid">
-                    {cards.map(card => {
-                      const price = card.tcgplayer?.prices?.holofoil?.market
-                        ?? card.tcgplayer?.prices?.normal?.market
-                        ?? card.tcgplayer?.prices?.['1stEditionHolofoil']?.market
-                        ?? card.tcgplayer?.prices?.unlimited?.market;
-                      return (
-                        <div key={card.id} className="sets-browse-card" onClick={() => setModalCard(card)}>
-                          <img src={card.images.small} alt={card.name} loading="lazy" />
-                          <p className="sets-browse-card__name">{card.name}</p>
-                          <p className="sets-browse-card__number">#{card.number}</p>
-                          {price != null
-                            ? <p className="sets-browse-card__price">{symbol}{price.toFixed(2)}</p>
-                            : <p className="sets-browse-card__no-price">No price</p>
-                          }
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {totalCardPages > 1 && (
-                    <div className="sets-card-pagination">
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => handleCardPageChange(Math.max(1, cardPage - 1))}
-                        disabled={cardPage === 1}
-                      >
-                        <ChevronLeft size={18} />Prev
-                      </button>
-                      <span className="page-indicator" style={{ minWidth: 'unset' }}>
-                        Page {cardPage} / {totalCardPages}
-                      </span>
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => handleCardPageChange(Math.min(totalCardPages, cardPage + 1))}
-                        disabled={cardPage === totalCardPages}
-                      >
-                        Next<ChevronRight size={18} />
-                      </button>
-                    </div>
-                  )}
-                </>
+                <div className="sets-card-grid">
+                  {cards.map(card => {
+                    const price = card.tcgplayer?.prices?.holofoil?.market
+                      ?? card.tcgplayer?.prices?.normal?.market
+                      ?? card.tcgplayer?.prices?.['1stEditionHolofoil']?.market
+                      ?? card.tcgplayer?.prices?.unlimited?.market;
+                    return (
+                      <div key={card.id} className="sets-browse-card" onClick={() => setModalCard(card)}>
+                        <img src={card.images.small} alt={card.name} loading="lazy" />
+                        <p className="sets-browse-card__name">{card.name}</p>
+                        <p className="sets-browse-card__number">#{card.number}</p>
+                        {price != null
+                          ? <p className="sets-browse-card__price">{symbol}{price.toFixed(2)}</p>
+                          : <p className="sets-browse-card__no-price">—</p>
+                        }
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </>
           )}

@@ -106,6 +106,72 @@ export async function searchCards(query, filters = {}, page = 1, sortBy = '') {
   }
 }
 
+// ── Set cards (all cards in a single set, up to 250) ─────────────────────────
+
+/**
+ * Parse a card number string into a sortable integer.
+ * Handles "1", "001", "TG01", "GX01", "SV001", "RC01", "SWSH001", etc.
+ * Returns the first numeric run as an integer, or Infinity if none found.
+ */
+function parseCardNumber(numStr) {
+  if (!numStr) return Infinity;
+  const match = String(numStr).match(/(\d+)/);
+  return match ? parseInt(match[1], 10) : Infinity;
+}
+
+function sortSetCards(cards, sort) {
+  if (sort === 'price_desc' || sort === 'price_asc') {
+    const getPrice = c =>
+      c.tcgplayer?.prices?.holofoil?.market ??
+      c.tcgplayer?.prices?.normal?.market ??
+      c.tcgplayer?.prices?.['1stEditionHolofoil']?.market ??
+      c.tcgplayer?.prices?.unlimited?.market ?? -1;
+    return [...cards].sort((a, b) =>
+      sort === 'price_desc' ? getPrice(b) - getPrice(a) : getPrice(a) - getPrice(b)
+    );
+  }
+  if (sort === 'number' || sort === '-number') {
+    const dir = sort === '-number' ? -1 : 1;
+    return [...cards].sort((a, b) => dir * (parseCardNumber(a.number) - parseCardNumber(b.number)));
+  }
+  if (sort === '-name') {
+    return [...cards].sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+  }
+  if (sort === 'name') {
+    return [...cards].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }
+  return cards;
+}
+
+/**
+ * Fetch ALL cards for a set (up to 250 per request, covers virtually all sets).
+ * Results are cached in localStorage for 15 minutes per set+sort combo.
+ */
+export async function getSetCards(setId, sort = 'number') {
+  const cacheKey = `pkb_sc_${setId}_${sort}`;
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const { data, ts } = JSON.parse(cached);
+      if (Date.now() - ts < 15 * 60 * 1000) return { data, error: null };
+    }
+  } catch { /* ignore */ }
+
+  try {
+    // Fetch up to 250; sort by number at API level for initial order
+    const url = `${BASE_URL}/cards?q=${encodeURIComponent(`set.id:${setId}`)}&pageSize=250&orderBy=number`;
+    const res = await fetch(url, { headers: getHeaders() });
+    if (!res.ok) throw new Error(`TCG API ${res.status}`);
+    const json = await res.json();
+    const cards = sortSetCards(json.data || [], sort);
+    try { localStorage.setItem(cacheKey, JSON.stringify({ data: cards, ts: Date.now() })); } catch { /* storage full */ }
+    return { data: cards, error: null };
+  } catch (err) {
+    console.error('getSetCards error:', err);
+    return { data: null, error: err };
+  }
+}
+
 // ── Sets ──────────────────────────────────────────────────────────────────────
 
 export async function getSets() {
