@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Book, RefreshCw, Settings } from 'lucide-react';
+import { Book, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import './App.css';
 import { supabase } from './supabase.js';
 import { BACKGROUND_THEMES } from './constants/themes';
-import SettingsPanel from './components/SettingsPanel';
+import SettingsPage from './components/SettingsPage';
 import BindersView from './components/BindersView';
 import EditBinderCover from './components/EditBinderCover';
 import BinderView from './components/BinderView';
@@ -97,7 +97,6 @@ function Dashboard() {
   const [totalSearchPages, setTotalSearchPages] = useState(0);
 
   // ── Settings state ───────────────────────────────────────────────────────
-  const [showSettings, setShowSettings] = useState(false);
   const [appSettings, setAppSettings] = useState({ backgroundTheme: 'default' });
 
   // ── Bootstrap ────────────────────────────────────────────────────────────
@@ -324,39 +323,25 @@ function Dashboard() {
     <div className="app">
       <div className="container">
         <div className={`header${view === 'binderView' ? ' header--compact' : ''}`}>
-          <h1>
-            <Book size={40} style={{ marginRight: '15px' }} />
-            PokeBinder
-          </h1>
-          <p className="header-subtitle">
-            Struggling bringing your binder everywhere you go?
-            <br />Organize and showcase your Pokémon TCG collection here in PokéBinder!
-            <br /><br />By: MrWack
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '10px' }}>
-            {syncing && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', opacity: 0.7 }}>
-                <RefreshCw size={16} className="spinning" />
-                <span style={{ fontSize: '0.9rem' }}>Syncing…</span>
-              </div>
-            )}
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button className="btn btn-secondary" onClick={() => setShowSettings(!showSettings)}>
-                <Settings size={20} />
-                Settings
-              </button>
-              <UserMenu onOpenSettings={() => setShowSettings(true)} />
+          <div className="header-top">
+            <h1>
+              <Book size={36} style={{ marginRight: '12px' }} />
+              PokéBinder
+            </h1>
+            <div className="header-actions">
+              {syncing && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.65, fontSize: '0.85rem' }}>
+                  <RefreshCw size={14} className="spinning" />
+                  Syncing…
+                </div>
+              )}
+              <UserMenu />
             </div>
           </div>
+          <p className="header-subtitle">
+            Organize and showcase your Pokémon TCG collection digitally.
+          </p>
         </div>
-
-        {showSettings && (
-          <SettingsPanel
-            settings={appSettings}
-            onSave={saveAppSettings}
-            onClose={() => setShowSettings(false)}
-          />
-        )}
 
         {view === 'binders' && (
           <BindersView
@@ -426,6 +411,7 @@ export default function App() {
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
