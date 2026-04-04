@@ -248,8 +248,12 @@ function Dashboard() {
       card_image_url: apiCard.images?.small ?? apiCard.images?.large ?? '',
       card_set: apiCard.set?.name ?? null,
       card_game: 'pokemon',
-      card_price: apiCard.cardmarket?.prices?.averageSellPrice ?? null,
-      card_price_currency: 'EUR',
+      card_price: apiCard.tcgplayer?.prices?.holofoil?.market
+        ?? apiCard.tcgplayer?.prices?.normal?.market
+        ?? apiCard.tcgplayer?.prices?.['1stEditionHolofoil']?.market
+        ?? apiCard.tcgplayer?.prices?.unlimited?.market
+        ?? null,
+      card_price_currency: 'USD',
     });
     if (error || !data) {
       console.error('addCard error:', error);

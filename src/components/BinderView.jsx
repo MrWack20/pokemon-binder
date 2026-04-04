@@ -344,9 +344,13 @@ export default function BinderView({
                   <img src={card.images.small} alt={card.name} loading="lazy" />
                   <p>{card.name}</p>
                   <p className="text-muted" style={{ fontSize: '0.7rem', marginBottom: '4px' }}>{card.set.name}</p>
-                  {card.cardmarket?.prices?.averageSellPrice && (
-                    <p className="price">€{card.cardmarket.prices.averageSellPrice.toFixed(2)}</p>
-                  )}
+                  {(() => {
+                    const p = card.tcgplayer?.prices?.holofoil?.market
+                      ?? card.tcgplayer?.prices?.normal?.market
+                      ?? card.tcgplayer?.prices?.['1stEditionHolofoil']?.market
+                      ?? card.tcgplayer?.prices?.unlimited?.market;
+                    return p ? <p className="price">${p.toFixed(2)}</p> : null;
+                  })()}
                 </div>
               ))}
             </div>
