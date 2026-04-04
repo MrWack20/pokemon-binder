@@ -22,36 +22,46 @@ body {
 }
 
 .header {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border-radius: 15px;
-  padding: 30px;
-  margin-bottom: 30px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(16px);
+  border-radius: 18px;
+  padding: 28px 32px;
+  margin-bottom: 28px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255,255,255,0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .header h1 {
-  font-size: 2.5rem;
-  margin-bottom: 10px;
+  font-size: 2.4rem;
+  margin-bottom: 0;
   display: flex;
   align-items: center;
+  letter-spacing: -0.02em;
+}
+
+.brand-text {
+  background: linear-gradient(135deg, #fbbf24 0%, #ffffff 55%, #93c5fd 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .header p {
-  opacity: 0.8;
-  font-size: 1.1rem;
+  opacity: 0.7;
+  font-size: 1rem;
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
+  margin-bottom: 24px;
   gap: 20px;
 }
 
 .section-header h2 {
-  font-size: 2rem;
+  font-size: 1.8rem;
+  letter-spacing: -0.02em;
 }
 
 .back-button {
@@ -70,11 +80,12 @@ body {
 }
 
 .card {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border-radius: 15px;
-  padding: 25px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255,255,255,0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .card h3 {
@@ -118,12 +129,16 @@ body {
 }
 
 .btn-primary {
-  background: #fbbf24;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
   color: #1e3a8a;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 4px 14px rgba(251,191,36,0.35);
 }
 
 .btn-primary:hover {
-  background: #f59e0b;
+  background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 100%);
+  box-shadow: 0 6px 20px rgba(251,191,36,0.5);
 }
 
 .btn-success {
@@ -214,16 +229,19 @@ body {
 }
 
 .binder-card {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+  border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .binder-card:hover {
-  transform: translateY(-5px);
+  transform: translateY(-6px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  border-color: rgba(251, 191, 36, 0.25);
 }
 
 .binder-cover {
@@ -241,7 +259,8 @@ body {
 }
 
 .binder-info {
-  padding: 20px;
+  padding: 18px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .search-bar {
@@ -260,17 +279,20 @@ body {
 }
 
 .search-card {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.07);
   border-radius: 10px;
   padding: 10px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.18s ease;
   text-align: center;
+  border: 1px solid transparent;
 }
 
 .search-card:hover {
-  transform: scale(1.05);
-  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05) translateY(-2px);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(251, 191, 36, 0.3);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
 }
 
 .search-card img {
@@ -307,21 +329,23 @@ body {
 }
 
 .card-slot.empty {
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px dashed rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  transition: background 0.15s, border-color 0.15s;
 }
 
 .card-slot.empty:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(251, 191, 36, 0.08);
+  border-color: rgba(251, 191, 36, 0.45);
 }
 
 .card-slot.filled {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .card-slot.filled:hover {
-  transform: scale(1.05);
+  transform: scale(1.04);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
 
 .card-slot.selected {
@@ -410,12 +434,14 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 20px;
-  margin-bottom: 30px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  padding: 20px;
-  border-radius: 15px;
+  gap: 16px;
+  margin-bottom: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(14px);
+  padding: 14px 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
 .page-indicator {
@@ -450,24 +476,24 @@ body {
 
 /* Improved dropdown/select styling */
 .input, select.input {
-  background-color: #2d3748;
+  background-color: rgba(15, 23, 42, 0.7);
   color: #e2e8f0;
-  border: 1px solid #4a5568;
-  padding: 10px;
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 10px 12px;
+  border-radius: 10px;
   font-size: 1rem;
-  transition: all 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .input:focus, select.input:focus {
   outline: none;
-  border-color: #3b82f6;
-  background-color: #374151;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.6);
+  background-color: rgba(15, 23, 42, 0.85);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
 
 .input::placeholder {
-  color: #9ca3af;
+  color: rgba(255, 255, 255, 0.35);
 }
 
 /* Dropdown options styling */
@@ -568,13 +594,13 @@ input[type="number"].input::-webkit-outer-spin-button {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  min-width: 210px;
+  min-width: 220px;
   z-index: 200;
-  background: rgba(15, 23, 42, 0.97);
-  backdrop-filter: blur(16px);
+  background: rgba(10, 15, 30, 0.98);
+  backdrop-filter: blur(20px);
   border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 14px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04) inset;
   overflow: hidden;
   animation: menu-pop 0.15s ease-out;
 }
@@ -596,36 +622,69 @@ input[type="number"].input::-webkit-outer-spin-button {
   align-items: center;
   justify-content: center;
   padding: 24px 16px;
+  background:
+    radial-gradient(ellipse at 15% 40%, rgba(59, 130, 246, 0.22) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 20%, rgba(139, 92, 246, 0.28) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 90%, rgba(251, 191, 36, 0.12) 0%, transparent 40%),
+    radial-gradient(ellipse at 70% 60%, rgba(219, 39, 119, 0.15) 0%, transparent 45%),
+    linear-gradient(160deg, #060612 0%, #0c1024 35%, #130820 65%, #060612 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle animated orb behind the form */
+.auth-page::before {
+  content: '';
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(251,191,36,0.06) 0%, transparent 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 .auth-container {
   width: 100%;
   max-width: 440px;
+  position: relative;
+  z-index: 1;
 }
 
 .auth-brand {
   text-align: center;
-  margin-bottom: 28px;
+  margin-bottom: 32px;
 }
 
 .auth-brand svg {
-  margin-bottom: 8px;
-  opacity: 0.9;
+  margin-bottom: 12px;
+  color: #fbbf24;
+  filter: drop-shadow(0 0 16px rgba(251,191,36,0.5));
 }
 
 .auth-brand h1 {
-  font-size: 2rem;
-  margin: 0 0 6px 0;
+  font-size: 2.4rem;
+  margin: 0 0 8px 0;
+  background: linear-gradient(135deg, #fbbf24 0%, #ffffff 50%, #93c5fd 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
 }
 
 .auth-brand p {
-  opacity: 0.6;
+  opacity: 0.55;
   font-size: 0.95rem;
   margin: 0;
 }
 
 .auth-card {
-  animation: card-in 0.25s ease-out;
+  background: rgba(15, 23, 42, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+  animation: card-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .auth-card h2 {
@@ -754,11 +813,17 @@ input[type="number"].input::-webkit-outer-spin-button {
 }
 
 .settings-card {
-  background: rgba(255,255,255,0.1);
-  backdrop-filter: blur(10px);
-  border-radius: 15px;
+  background: rgba(255,255,255,0.07);
+  backdrop-filter: blur(14px);
+  border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: border-color 0.2s;
+}
+
+.settings-card:hover {
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .settings-card__title {
@@ -805,12 +870,12 @@ input[type="number"].input::-webkit-outer-spin-button {
 
 /* ── Compact header (binder view) ────────────────────────────────────────── */
 .header--compact {
-  padding: 14px 24px;
-  margin-bottom: 16px;
+  padding: 12px 24px;
+  margin-bottom: 14px;
 }
 .header--compact h1 {
-  font-size: 1.6rem;
-  margin-bottom: 2px;
+  font-size: 1.5rem;
+  margin-bottom: 0;
 }
 .header--compact .header-subtitle {
   display: none;
@@ -865,22 +930,24 @@ input[type="number"].input::-webkit-outer-spin-button {
 
 /* ── Grid container ──────────────────────────────────────────────────────── */
 .binder-grid-container {
-  background: rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(10px);
-  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(14px);
+  border-radius: 16px;
   padding: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 /* ── Search drawer ───────────────────────────────────────────────────────── */
 .search-drawer {
   width: 360px;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(12px);
-  border-radius: 15px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(16px);
+  border-radius: 16px;
   padding: 18px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.07);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   max-height: calc(100vh - 140px);
   overflow-y: auto;
   position: sticky;
@@ -1145,14 +1212,14 @@ input[type="number"].input::-webkit-outer-spin-button {
 
 .modal-card {
   position: relative;
-  background: rgba(15, 23, 42, 0.97);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 18px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  background: rgba(10, 15, 30, 0.97);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255,255,255,0.04) inset;
   max-width: 760px;
   width: 100%;
-  animation: modal-up 0.2s ease-out;
+  animation: modal-up 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
 }
 
@@ -1319,19 +1386,29 @@ input[type="number"].input::-webkit-outer-spin-button {
 }
 
 .stat-card {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
   border-radius: 14px;
   padding: 20px;
   display: flex;
   gap: 16px;
   align-items: flex-start;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255,255,255,0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .stat-card__icon {
   flex-shrink: 0;
   margin-top: 2px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .stat-card__body {

@@ -334,8 +334,8 @@ function Dashboard() {
         <div className={`header${view === 'binderView' ? ' header--compact' : ''}`}>
           <div className="header-top">
             <h1>
-              <Book size={36} style={{ marginRight: '12px' }} />
-              PokéBinder
+              <Book size={36} style={{ marginRight: '12px', flexShrink: 0, color: '#fbbf24' }} />
+              <span className="brand-text">PokéBinder</span>
             </h1>
             <div className="header-actions">
               {syncing && (
