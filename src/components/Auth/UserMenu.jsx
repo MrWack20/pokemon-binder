@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, LogOut, ChevronDown, Loader, BarChart2 } from 'lucide-react';
+import { Settings, LogOut, ChevronDown, Loader, BarChart2, Layers } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 
@@ -70,6 +70,11 @@ export default function UserMenu() {
               icon={<BarChart2 size={16} />}
               label="Statistics"
               onClick={() => { setOpen(false); navigate('/stats'); }}
+            />
+            <MenuItem
+              icon={<Layers size={16} />}
+              label="Browse Sets"
+              onClick={() => { setOpen(false); navigate('/sets'); }}
             />
             <MenuItem
               icon={<Settings size={16} />}

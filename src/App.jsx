@@ -7,6 +7,7 @@ import { supabase } from './supabase.js';
 import { BACKGROUND_THEMES } from './constants/themes';
 import SettingsPage from './components/SettingsPage';
 import StatsPage from './components/StatsPage';
+import SetsPage from './components/SetsPage';
 import CardDetailModal from './components/CardDetailModal';
 import BindersView from './components/BindersView';
 import EditBinderCover from './components/EditBinderCover';
@@ -440,6 +441,7 @@ export default function App() {
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
           <Route path="/stats" element={<ProtectedRoute><StatsPage /></ProtectedRoute>} />
+          <Route path="/sets" element={<ProtectedRoute><SetsPage /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
