@@ -112,12 +112,7 @@ function Dashboard() {
 
   useEffect(() => {
     const theme = BACKGROUND_THEMES[appSettings.backgroundTheme] || BACKGROUND_THEMES.default;
-    const { colors } = theme;
-    if (colors.length === 2) {
-      document.body.style.background = `linear-gradient(135deg, ${colors[0]} 0%, ${colors[1]} 100%)`;
-    } else if (colors.length === 3) {
-      document.body.style.background = `linear-gradient(135deg, ${colors[0]} 0%, ${colors[1]} 50%, ${colors[2]} 100%)`;
-    }
+    document.body.style.background = theme.css;
     document.body.style.minHeight = '100vh';
   }, [appSettings.backgroundTheme]);
 
@@ -328,7 +323,7 @@ function Dashboard() {
   return (
     <div className="app">
       <div className="container">
-        <div className="header">
+        <div className={`header${view === 'binderView' ? ' header--compact' : ''}`}>
           <h1>
             <Book size={40} style={{ marginRight: '15px' }} />
             PokeBinder

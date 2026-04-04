@@ -554,6 +554,157 @@ input[type="number"].input::-webkit-outer-spin-button {
   line-height: 1.6;
 }
 
+/* ── Compact header (binder view) ────────────────────────────────────────── */
+.header--compact {
+  padding: 14px 24px;
+  margin-bottom: 16px;
+}
+.header--compact h1 {
+  font-size: 1.6rem;
+  margin-bottom: 2px;
+}
+.header--compact .header-subtitle {
+  display: none;
+}
+
+/* ── Binder view root ────────────────────────────────────────────────────── */
+.binder-view-root {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Binder toolbar ──────────────────────────────────────────────────────── */
+.binder-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.binder-toolbar__title {
+  flex: 1;
+  min-width: 0;
+}
+
+.binder-toolbar__title h2 {
+  font-size: 1.6rem;
+  margin: 0 0 2px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.binder-toolbar__actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* ── Binder body (two-column) ────────────────────────────────────────────── */
+.binder-body {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.binder-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Grid container ──────────────────────────────────────────────────────── */
+.binder-grid-container {
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+
+/* ── Search drawer ───────────────────────────────────────────────────────── */
+.search-drawer {
+  width: 360px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  border-radius: 15px;
+  padding: 18px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  position: sticky;
+  top: 16px;
+  animation: drawer-in 0.2s ease-out;
+}
+
+@keyframes drawer-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.search-drawer__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.search-drawer__header h3 {
+  font-size: 1.05rem;
+  margin: 0 0 4px 0;
+}
+
+.slot-badge {
+  display: inline-block;
+  background: rgba(251, 191, 36, 0.18);
+  border: 1px solid rgba(251, 191, 36, 0.6);
+  color: #fbbf24;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 20px;
+  letter-spacing: 0.03em;
+}
+
+/* Results grid inside drawer */
+.drawer-results {
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  max-height: 42vh;
+}
+
+/* Search pagination inside drawer */
+.drawer-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+/* ── Icon-only buttons ───────────────────────────────────────────────────── */
+.icon-btn {
+  padding: 8px;
+  line-height: 1;
+}
+
+/* ── Jump-to-page ────────────────────────────────────────────────────────── */
+.page-jump {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.page-jump__input {
+  width: 80px;
+  margin-bottom: 0 !important;
+  padding: 8px 10px;
+  text-align: center;
+}
+
 /* ── Drag & drop ─────────────────────────────────────────────────────────── */
 .drag-handle {
   position: absolute;
@@ -585,8 +736,8 @@ input[type="number"].input::-webkit-outer-spin-button {
   grid-template-columns: 1fr 1fr;
 }
 
-/* ── Responsive: tablet (640px – 1023px) ────────────────────────────────── */
-@media (max-width: 1023px) {
+/* ── Responsive: tablet (768px – 1099px) ────────────────────────────────── */
+@media (max-width: 1099px) {
   .header h1 {
     font-size: 2rem;
   }
@@ -595,20 +746,24 @@ input[type="number"].input::-webkit-outer-spin-button {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   }
 
-  .card-results {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  .search-drawer {
+    width: 300px;
+  }
+
+  .drawer-results {
+    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
   }
 }
 
-/* ── Responsive: mobile (<640px) ─────────────────────────────────────────── */
-@media (max-width: 639px) {
+/* ── Responsive: mobile (<768px) ─────────────────────────────────────────── */
+@media (max-width: 767px) {
   .app {
-    padding: 12px;
+    padding: 10px;
   }
 
   .header {
-    padding: 16px;
-    margin-bottom: 16px;
+    padding: 14px;
+    margin-bottom: 12px;
   }
 
   .header h1 {
@@ -617,6 +772,36 @@ input[type="number"].input::-webkit-outer-spin-button {
 
   .header-subtitle {
     display: none;
+  }
+
+  /* Binder view stacks vertically on mobile */
+  .binder-body {
+    flex-direction: column;
+  }
+
+  .search-drawer {
+    width: 100%;
+    position: static;
+    max-height: 70vh;
+    animation: drawer-down 0.2s ease-out;
+  }
+
+  @keyframes drawer-down {
+    from { opacity: 0; transform: translateY(-10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .binder-toolbar {
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .binder-toolbar__title h2 {
+    font-size: 1.2rem;
+  }
+
+  .binder-toolbar__actions {
+    gap: 6px;
   }
 
   .section-header {
@@ -630,7 +815,7 @@ input[type="number"].input::-webkit-outer-spin-button {
   }
 
   .card {
-    padding: 16px;
+    padding: 14px;
   }
 
   .grid {
@@ -646,42 +831,43 @@ input[type="number"].input::-webkit-outer-spin-button {
     grid-template-columns: 1fr;
   }
 
-  .search-bar {
-    flex-direction: column;
-  }
-
-  .search-bar .btn {
-    width: 100%;
+  .pagination {
+    padding: 10px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
     justify-content: center;
   }
 
-  .pagination {
-    padding: 12px;
-    gap: 10px;
+  .page-jump {
+    order: 3;
   }
 
   .btn {
-    padding: 10px 16px;
+    padding: 9px 14px;
     font-size: 0.9rem;
   }
 
   .btn-danger {
-    padding: 10px;
+    padding: 9px;
+  }
+
+  .icon-btn {
+    padding: 7px;
   }
 
   .card-results {
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 8px;
   }
 
   .binder-grid {
-    gap: 8px;
-    padding: 10px;
+    gap: 6px;
+    padding: 8px;
   }
 
   .page-indicator {
-    font-size: 0.95rem;
-    min-width: 100px;
+    font-size: 0.9rem;
+    min-width: unset;
   }
 
   .button-group {
