@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, User, Lock, Mail, Palette, ArrowLeft, LogOut } from 'lucide-react';
+import { Save, User, Lock, Mail, Palette, ArrowLeft, LogOut, DollarSign } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { BACKGROUND_THEMES } from '../constants/themes';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -23,6 +23,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
 
   const [selectedTheme, setSelectedTheme] = useState(() => loadSettings().backgroundTheme);
+  const [currency, setCurrency] = useState(() => loadSettings().currency || 'USD');
   const [displayName, setDisplayName] = useState(profile?.name ?? '');
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -45,6 +46,12 @@ export default function SettingsPage() {
     const settings = { ...loadSettings(), backgroundTheme: selectedTheme };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     toast.success('Theme saved.');
+  }
+
+  function handleSaveCurrency() {
+    const settings = { ...loadSettings(), currency };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    toast.success('Currency saved.');
   }
 
   async function handleSaveName() {
@@ -201,6 +208,25 @@ export default function SettingsPage() {
                   </button>
                 </>
               )}
+            </section>
+
+            {/* ── Currency ────────────────────────────────────────────── */}
+            <section className="settings-card">
+              <div className="settings-card__title">
+                <DollarSign size={20} /><h3>Currency</h3>
+              </div>
+              <p className="settings-card__desc">Used for card prices and collection value.</p>
+              <div className="form-group">
+                <label>Display Currency</label>
+                <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="input">
+                  <option value="USD">USD — US Dollar ($)</option>
+                  <option value="EUR">EUR — Euro (€)</option>
+                  <option value="GBP">GBP — British Pound (£)</option>
+                </select>
+              </div>
+              <button onClick={handleSaveCurrency} className="btn btn-success">
+                <Save size={16} />Save Currency
+              </button>
             </section>
 
             {/* ── Sign Out ────────────────────────────────────────────── */}

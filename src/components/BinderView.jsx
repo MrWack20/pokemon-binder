@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { Edit2, ChevronLeft, ChevronRight, Filter, X, Search, Plus, GripVertical } from 'lucide-react';
+import { Edit2, ChevronLeft, ChevronRight, Filter, X, Search, Plus, GripVertical, SortAsc, Clock } from 'lucide-react';
+import { getRecentSearches } from '../services/searchService.js';
 import {
   DndContext,
   DragOverlay,
@@ -13,7 +14,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 
 // ─── Card slot ────────────────────────────────────────────────────────────────
 
-function CardSlot({ absoluteIndex, card, isSelected, onSelectCell, onRemoveCard, isDragActive }) {
+function CardSlot({ absoluteIndex, card, isSelected, onSelectCell, onRemoveCard, onCardClick, isDragActive }) {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: absoluteIndex,
     disabled: !card,
@@ -25,12 +26,18 @@ function CardSlot({ absoluteIndex, card, isSelected, onSelectCell, onRemoveCard,
     [setDragRef, setDropRef],
   );
 
+  function handleClick() {
+    if (isDragActive) return;
+    if (card) { onCardClick?.(card); }
+    else { onSelectCell(absoluteIndex); }
+  }
+
   return (
     <div
       ref={setRef}
       {...(card ? attributes : {})}
       {...(card ? listeners : {})}
-      onClick={() => !card && !isDragActive && onSelectCell(absoluteIndex)}
+      onClick={handleClick}
       className={[
         'card-slot',
         card ? 'filled' : 'empty',
@@ -63,9 +70,9 @@ function CardSlot({ absoluteIndex, card, isSelected, onSelectCell, onRemoveCard,
 
 export default function BinderView({
   binder, currentPage, onPageChange, onBack, onEditCover, selectedCell, onSelectCell,
-  onRemoveCard, searchQuery, onSearchChange, onSearch, searchResults, loading, onAddCard,
+  onRemoveCard, onCardClick, searchQuery, onSearchChange, onSearch, searchResults, loading, onAddCard,
   searchFilters, onFilterChange, sets, showFilters, onToggleFilters, searchPage, totalSearchPages,
-  onSearchPageChange, onSwapCards,
+  onSearchPageChange, onSwapCards, searchSort, onSortChange, currency,
 }) {
   const slotsPerPage = binder.rows * binder.cols;
   const startIndex = currentPage * slotsPerPage;
@@ -75,6 +82,10 @@ export default function BinderView({
 
   const [jumpInput, setJumpInput] = useState('');
   const [activeDragId, setActiveDragId] = useState(null);
+
+  const currencySymbol = { USD: '$', EUR: '€', GBP: '£' }[currency] || '$';
+  const pageValue = currentPageCards.reduce((sum, c) => sum + (c?.card_price || 0), 0);
+  const recentSearches = getRecentSearches();
   const activeDragCard = activeDragId !== null ? binder.cards[activeDragId] : null;
 
   const sensors = useSensors(
@@ -181,6 +192,13 @@ export default function BinderView({
             </button>
           </div>
 
+          {pageValue > 0 && (
+            <div className="page-value-bar">
+              <span className="page-value-bar__label">Page value</span>
+              <span className="page-value-bar__amount">{currencySymbol}{pageValue.toFixed(2)}</span>
+            </div>
+          )}
+
           <div className="binder-grid-container">
             <DndContext
               sensors={sensors}
@@ -205,6 +223,7 @@ export default function BinderView({
                       isSelected={selectedCell === absoluteIndex}
                       onSelectCell={onSelectCell}
                       onRemoveCard={onRemoveCard}
+                      onCardClick={onCardClick}
                       isDragActive={activeDragId !== null}
                     />
                   );
@@ -247,7 +266,24 @@ export default function BinderView({
               </div>
             </div>
 
-            <div className="search-bar" style={{ marginBottom: '12px' }}>
+            {recentSearches.length > 0 && !searchQuery && (
+              <div className="recent-searches">
+                <span className="recent-searches__label"><Clock size={12} />Recent</span>
+                <div className="recent-searches__chips">
+                  {recentSearches.map(term => (
+                    <button
+                      key={term}
+                      className="recent-chip"
+                      onClick={() => { onSearchChange(term); onSearch(term, searchFilters, 1); }}
+                    >
+                      {term}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="search-bar" style={{ marginBottom: '8px' }}>
               <input
                 type="text"
                 value={searchQuery}
@@ -260,6 +296,21 @@ export default function BinderView({
               <button onClick={handleSearch} className="btn btn-info" style={{ flexShrink: 0 }}>
                 <Search size={18} />
               </button>
+            </div>
+
+            <div className="drawer-sort" style={{ marginBottom: '12px' }}>
+              <SortAsc size={14} style={{ opacity: 0.55, flexShrink: 0 }} />
+              <select
+                value={searchSort}
+                onChange={(e) => onSortChange(e.target.value)}
+                className="input drawer-sort__select"
+              >
+                <option value="">Newest Set</option>
+                <option value="name">Name A–Z</option>
+                <option value="number">Card Number</option>
+                <option value="price_desc">Price: High → Low</option>
+                <option value="price_asc">Price: Low → High</option>
+              </select>
             </div>
 
             {showFilters && (

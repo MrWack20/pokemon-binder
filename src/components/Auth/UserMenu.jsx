@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, LogOut, ChevronDown, Loader } from 'lucide-react';
+import { Settings, LogOut, ChevronDown, Loader, BarChart2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 
@@ -66,6 +66,11 @@ export default function UserMenu() {
             <div style={{ fontSize: '0.78rem', opacity: 0.55, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
           </div>
           <div style={{ padding: '6px' }}>
+            <MenuItem
+              icon={<BarChart2 size={16} />}
+              label="Statistics"
+              onClick={() => { setOpen(false); navigate('/stats'); }}
+            />
             <MenuItem
               icon={<Settings size={16} />}
               label="Settings"

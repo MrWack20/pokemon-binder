@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, Eye } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Trash2, Eye, Copy, ArrowUpDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function BindersView({ profile, binders, onCreateBinder, onSelectBinder, onDeleteBinder }) {
+export default function BindersView({ profile, binders, onCreateBinder, onSelectBinder, onDeleteBinder, onDuplicateBinder }) {
   const [showCreate, setShowCreate] = useState(false);
+  const [sortOrder, setSortOrder] = useState('date_asc');
   const [binderForm, setBinderForm] = useState({
     name: '',
     rows: 3,
@@ -49,14 +50,33 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
   const totalCapacity = binderForm.rows * binderForm.cols * binderForm.pages;
   const suggestedPages = Math.ceil(1025 / (binderForm.rows * binderForm.cols));
 
+  const sortedBinders = useMemo(() => {
+    const arr = [...binders];
+    if (sortOrder === 'name_asc') arr.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sortOrder === 'name_desc') arr.sort((a, b) => b.name.localeCompare(a.name));
+    else if (sortOrder === 'date_asc') arr.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    else if (sortOrder === 'date_desc') arr.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return arr;
+  }, [binders, sortOrder]);
+
   return (
     <div>
       <div className="section-header">
         <h2>{profile?.name}'s Binders</h2>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-          <Plus size={20} />
-          New Binder
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div className="binders-sort">
+            <ArrowUpDown size={15} style={{ opacity: 0.6 }} />
+            <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="input binders-sort__select">
+              <option value="date_asc">Oldest first</option>
+              <option value="date_desc">Newest first</option>
+              <option value="name_asc">Name A–Z</option>
+              <option value="name_desc">Name Z–A</option>
+            </select>
+          </div>
+          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+            <Plus size={20} />New Binder
+          </button>
+        </div>
       </div>
 
       {showCreate && (
@@ -132,7 +152,7 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
       )}
 
       <div className="grid">
-        {binders.map(binder => {
+        {sortedBinders.map(binder => {
           const cardCount = parseInt(binder.binder_cards?.[0]?.count ?? 0);
           const totalSlots = binder.rows * binder.cols * binder.pages;
           return (
@@ -161,8 +181,14 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
                 <p className="text-muted">{cardCount}/{totalSlots} cards</p>
                 <div className="button-group">
                   <button onClick={() => onSelectBinder(binder)} className="btn btn-info">
-                    <Eye size={16} />
-                    View
+                    <Eye size={16} />View
+                  </button>
+                  <button
+                    onClick={() => onDuplicateBinder?.(binder.id, binder.name)}
+                    className="btn btn-secondary"
+                    title="Duplicate binder"
+                  >
+                    <Copy size={16} />
                   </button>
                   <button
                     onClick={() => {

@@ -6,6 +6,8 @@ import './App.css';
 import { supabase } from './supabase.js';
 import { BACKGROUND_THEMES } from './constants/themes';
 import SettingsPage from './components/SettingsPage';
+import StatsPage from './components/StatsPage';
+import CardDetailModal from './components/CardDetailModal';
 import BindersView from './components/BindersView';
 import EditBinderCover from './components/EditBinderCover';
 import BinderView from './components/BinderView';
@@ -22,6 +24,7 @@ import {
   createBinder as createBinderSvc,
   updateBinder as updateBinderSvc,
   deleteBinder as deleteBinderSvc,
+  duplicateBinder as duplicateBinderSvc,
 } from './services/binderService.js';
 import {
   getBinderCards,
@@ -30,7 +33,7 @@ import {
   moveCard,
   swapCards as swapCardsSvc,
 } from './services/cardService.js';
-import { searchCards as searchCardsSvc, getSets } from './services/searchService.js';
+import { searchCards as searchCardsSvc, getSets, addRecentSearch } from './services/searchService.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -92,9 +95,10 @@ function Dashboard() {
   });
   const [sets, setSets] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
-  const [searchCache, setSearchCache] = useState({});
   const [searchPage, setSearchPage] = useState(1);
   const [totalSearchPages, setTotalSearchPages] = useState(0);
+  const [searchSort, setSearchSort] = useState('');
+  const [modalCard, setModalCard] = useState(null);
 
   // ── Settings state ───────────────────────────────────────────────────────
   const [appSettings, setAppSettings] = useState({ backgroundTheme: 'default' });
@@ -141,18 +145,11 @@ function Dashboard() {
   };
 
   // ── Search ────────────────────────────────────────────────────────────────
-  const handleSearch = async (query, filters = searchFilters, page = 1) => {
-    const cacheKey = JSON.stringify({ query, filters, page });
-    if (searchCache[cacheKey]) {
-      setSearchResults(searchCache[cacheKey].results);
-      setTotalSearchPages(searchCache[cacheKey].totalPages);
-      setSearchPage(page);
-      setLoading(false);
-      return;
-    }
+  const handleSearch = async (query, filters = searchFilters, page = 1, sort = searchSort) => {
     setLoading(true);
     setSearchResults([]);
-    const { data, error } = await searchCardsSvc(query, filters, page);
+    if (query?.trim()) addRecentSearch(query);
+    const { data, error } = await searchCardsSvc(query, filters, page, sort);
     if (error || !data) {
       setSearchResults([]);
       setTotalSearchPages(0);
@@ -160,7 +157,6 @@ function Dashboard() {
       toast.error('Search failed. Try different terms or filters.');
       return;
     }
-    setSearchCache(prev => ({ ...prev, [cacheKey]: data }));
     setSearchResults(data.results);
     setTotalSearchPages(data.totalPages);
     setSearchPage(page);
@@ -216,6 +212,15 @@ function Dashboard() {
     if (error) { toast.error('Failed to delete binder.'); setSyncing(false); return; }
     setBinders(prev => prev.filter(b => b.id !== binderId));
     toast.success('Binder deleted.');
+    setSyncing(false);
+  };
+
+  const handleDuplicateBinder = async (binderId, binderName) => {
+    setSyncing(true);
+    const { data, error } = await duplicateBinderSvc(binderId);
+    if (error || !data) { toast.error('Failed to duplicate binder.'); setSyncing(false); return; }
+    setBinders(prev => [...prev, { ...data, binder_cards: [{ count: 0 }] }]);
+    toast.success(`"${binderName}" duplicated.`);
     setSyncing(false);
   };
 
@@ -354,6 +359,7 @@ function Dashboard() {
             onCreateBinder={handleCreateBinder}
             onSelectBinder={handleSelectBinder}
             onDeleteBinder={handleDeleteBinder}
+            onDuplicateBinder={handleDuplicateBinder}
           />
         )}
 
@@ -372,6 +378,7 @@ function Dashboard() {
             selectedCell={selectedCell}
             onSelectCell={setSelectedCell}
             onRemoveCard={handleRemoveCard}
+            onCardClick={setModalCard}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onSearch={handleSearch}
@@ -385,8 +392,11 @@ function Dashboard() {
             onToggleFilters={setShowFilters}
             searchPage={searchPage}
             totalSearchPages={totalSearchPages}
-            onSearchPageChange={(page) => handleSearch(searchQuery, searchFilters, page)}
+            onSearchPageChange={(page) => handleSearch(searchQuery, searchFilters, page, searchSort)}
             onSwapCards={handleSwapCards}
+            searchSort={searchSort}
+            onSortChange={(sort) => { setSearchSort(sort); handleSearch(searchQuery, searchFilters, 1, sort); }}
+            currency={(() => { try { return JSON.parse(localStorage.getItem('pokemonBinderSettings') || '{}').currency || 'USD'; } catch { return 'USD'; } })()}
           />
         )}
 
@@ -395,6 +405,19 @@ function Dashboard() {
             binder={selectedBinder}
             onSave={handleEditBinderSave}
             onCancel={() => setView('binderView')}
+          />
+        )}
+
+        {modalCard && (
+          <CardDetailModal
+            card={modalCard}
+            currency={(() => { try { return JSON.parse(localStorage.getItem('pokemonBinderSettings') || '{}').currency || 'USD'; } catch { return 'USD'; } })()}
+            onClose={() => setModalCard(null)}
+            onRemove={() => {
+              const slotIndex = selectedBinder?.cards.findIndex(c => c?.id === modalCard.id);
+              if (slotIndex !== undefined && slotIndex !== -1) handleRemoveCard(slotIndex);
+              setModalCard(null);
+            }}
           />
         )}
       </div>
@@ -416,6 +439,7 @@ export default function App() {
           <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+          <Route path="/stats" element={<ProtectedRoute><StatsPage /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
