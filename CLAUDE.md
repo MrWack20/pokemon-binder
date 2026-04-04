@@ -4,10 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PokeBinder is a web app for organizing and showcasing a Pokémon TCG collection digitally.
+PokéBinder is a web app for organizing and showcasing a Pokémon TCG collection digitally.
 Built by MrWack (GitHub: MrWack20). Repo: https://github.com/MrWack20/pokemon-binder
 
-**Stack:** React 19, Vite 7, Supabase (auth + Postgres + Storage), Pokémon TCG API v2, Lucide React, React Router DOM v7.
+**Stack:** React 19, Vite 7, Supabase (auth + Postgres + Storage), Pokémon TCG API v2, Lucide React, React Router DOM v7, Recharts, @dnd-kit/core, react-hot-toast.
 
 ---
 
@@ -34,7 +34,7 @@ VITE_SUPABASE_ANON_KEY=<anon key>
 VITE_POKEMON_TCG_API_KEY=<tcg api key>
 ```
 
-On Vercel, `VITE_SUPABASE_URL` must be set for **both** the Production *and* Preview (dev branch) environments separately — they are distinct environment types in Vercel. The other two vars can be set for all environments at once. Vite bakes these into the bundle at build time; changing them requires a new deployment.
+On Vercel, `VITE_SUPABASE_URL` must be set for **both** Production *and* Preview environments separately. The other two vars can be set for all environments at once. Vite bakes these into the bundle at build time; changing them requires a new deployment.
 
 ---
 
@@ -43,8 +43,7 @@ On Vercel, `VITE_SUPABASE_URL` must be set for **both** the Production *and* Pre
 - **Project ID:** `ssdmmlxnzlgjriqddpin`
 - **Region:** ap-northeast-2
 - **Storage bucket:** `binder-covers` (public) — for binder cover image uploads
-- **Auth redirect URLs** (must be added in Supabase Dashboard → Auth → URL Configuration):
-  - Site URL + redirect allow-list must include the Vercel preview URL for email confirmation and password reset to work on deployed builds.
+- **Auth redirect URLs** must include the Vercel preview URL for email confirmation and password reset to work on deployed builds.
 
 ---
 
@@ -67,36 +66,47 @@ RLS is enabled on all three tables — policies enforce users can only access th
 
 ### Data flow
 
-`App.jsx` is both the React Router root and the sole stateful component (Dashboard). All Supabase calls go through `src/services/` — components never import `supabase` directly. The service layer pattern:
+`App.jsx` is both the React Router root and the sole stateful component (`Dashboard`). All Supabase calls go through `src/services/` — components never import `supabase` directly.
 
-- `supabaseAuth.js` — wraps `supabase.auth.*` (signUp, signIn, signOut, onAuthStateChange, updateEmail, updatePassword, resetPassword)
-- `profileService.js` — CRUD for `profiles` table
-- `binderService.js` — CRUD for `binders` table; `getBinders` uses `.select('*, binder_cards(count)')` so each binder arrives with `binder.binder_cards[0].count`
+- `supabaseAuth.js` — wraps `supabase.auth.*`
+- `profileService.js` — CRUD for `profiles`
+- `binderService.js` — CRUD for `binders`; `getBinders` uses `.select('*, binder_cards(count)')` so each binder arrives with `binder.binder_cards[0].count`; also exports `duplicateBinder`
 - `cardService.js` — CRUD for `binder_cards`; `addCard` does delete-then-insert (not upsert) to avoid silent RLS failures on conflict
-- `searchService.js` — calls Pokémon TCG API v2 directly from the browser
+- `cardService.js:swapCards` uses slot index `-1` as a sentinel to work around the `UNIQUE(binder_id, slot_index)` constraint during the 3-step swap
+- `searchService.js` — calls Pokémon TCG API v2 from the browser; has a 15-min TTL localStorage cache (60-entry limit), 24-hour set cache, recent-search history (6 entries), and a `sortBy` parameter (`''|'name'|'number'|'price_desc'|'price_asc'`)
+- `statsService.js` — one Supabase FK-embedded query (`binders` + `binder_cards`), aggregated client-side; returns `{ totalBinders, totalCards, totalValue, topSets, binderValues, mostValuable, recentlyAdded }`
 
 ### Key architectural decisions
 
-**Slot array model** — Cards in the DB are rows with `slot_index`. `App.jsx:buildCardsArray()` reconstructs a flat array (length = rows × cols × pages, nulls for empty slots) that `BinderView` consumes. `BinderView`'s slot-index logic never touches the DB directly.
+**Slot array model** — Cards in the DB have `slot_index`. `App.jsx:buildCardsArray()` reconstructs a flat array (length = rows × cols × pages, nulls for empty slots) that `BinderView` consumes. Slot-index logic never touches the DB directly.
 
-**Drag/drop swap** — `BinderView` passes absolute slot indices to `onSwapCards`. `App.jsx` looks up the DB row UUID from the local slot array before calling `swapCards` or `moveCard`. `swapCards` uses slot `-1` as a sentinel to work around the `UNIQUE(binder_id, slot_index)` constraint during the 3-step swap.
+**Two card shapes** — TCG API objects (`card.images.small`, `card.name`, `card.set.name`) are used only in search results and the Sets browser. DB row objects (`card.card_image_url`, `card.card_name`, `card.card_set`) are used in the binder grid. `CardDetailModal` accepts both shapes and detects them via `!!card.images`. Never conflate the two shapes.
 
-**Search results vs binder cards** — TCG API objects (`card.images.small`, `card.name`) live only in the search results panel. The binder grid renders DB row objects (`card.card_image_url`, `card.card_name`, `card.card_price`). These are different shapes — don't conflate them.
+**Pricing** — All prices use TCGPlayer USD. Priority fallback chain: `holofoil → normal → 1stEditionHolofoil → unlimited` market price. `card_price_currency` is always `'USD'` in the DB.
 
-**Cover image upload** — `EditBinderCover` holds a `File` object in local state and passes it up via `onSave(coverData, imageFile)`. `App.jsx:uploadBinderCover()` does the actual upload to Supabase Storage bucket `binder-covers` and stores the public URL.
+**AuthContext bootstrap** — `getSession()` is called once on mount (reads localStorage, no network call for fresh tokens) to set initial auth state. `onAuthStateChange` handles subsequent events but skips `INITIAL_SESSION` to avoid double-processing. An 8-second fallback calls `setLoading(false)` if Supabase never responds. `ensureProfile()` auto-creates a profile row on first sign-in.
 
-**AuthContext** — `onAuthStateChange` subscription drives auth state. An 8-second timeout fallback calls `setLoading(false)` in case Supabase never responds (missing env vars, network error). `ensureProfile()` auto-creates a profile row on first sign-in using OAuth display name or email prefix.
+**User settings** — Persisted in localStorage under key `pokemonBinderSettings` as `{ backgroundTheme: string, currency: 'USD'|'EUR'|'GBP' }`. Read by `SettingsPage`, `StatsPage`, `BinderView`, and `SetsPage` directly from localStorage — not stored in the DB or passed as props from `App.jsx`.
 
-**SettingsPanel** — Has four sections: Appearance (background theme, saved to localStorage), Display Name, Change Email, Change Password. The last three call Supabase directly. OAuth users see a note that email/password is managed by their provider.
+**Theme system** — `BACKGROUND_THEMES` in `src/constants/themes.js` has shape `{ [key]: { name: string, css: string } }` where `css` is any valid CSS `background` value (supports `radial-gradient`, multi-stop). `App.jsx` applies it to `document.body.style.background`. The auth pages have their own fixed dark background defined in `.auth-page` CSS and are not affected by the theme.
+
+**BinderView view modes** — `BinderView` manages a local `viewMode` state (`'page'|'spread'|'gallery'`). Page mode fits the grid to viewport height using `height: calc(100vh - 265px)` and removes `aspect-ratio` from card slots. Spread mode shows two pages side by side as a book. Gallery mode renders all filled cards in a continuous responsive grid without page separators.
+
+**Cover image upload** — `EditBinderCover` holds a `File` in local state and passes it up via `onSave(coverData, imageFile)`. `App.jsx:uploadBinderCover()` uploads to Supabase Storage bucket `binder-covers` and stores the public URL.
 
 ### Routing
 
 ```
-/           → Dashboard (ProtectedRoute — redirects to /login if not authenticated)
-/login      → LoginPage
-/register   → RegisterPage
+/                → Dashboard (ProtectedRoute)
+/login           → LoginPage
+/register        → RegisterPage
 /forgot-password → ForgotPasswordPage
-*           → redirect to /
+/auth/callback   → AuthCallbackPage (OAuth + email confirm)
+/auth/reset-password → ResetPasswordPage
+/settings        → SettingsPage (ProtectedRoute)
+/stats           → StatsPage (ProtectedRoute) — collection statistics with Recharts
+/sets            → SetsPage (ProtectedRoute) — browse all TCG sets and their cards
+*                → redirect to /
 ```
 
 ---
