@@ -20,6 +20,12 @@ npm run preview    # Serve the production build locally
 npm run lint       # ESLint (eslint-plugin-react-hooks + react-refresh)
 ```
 
+When asked to "run the dev server" or "open the app", start the dev server AND open `http://localhost:5173` in Chrome:
+```bash
+npm run dev &
+start chrome http://localhost:5173
+```
+
 No test suite is configured. There is no `npm test`.
 
 ---
@@ -73,7 +79,7 @@ RLS is enabled on all three tables — policies enforce users can only access th
 - `binderService.js` — CRUD for `binders`; `getBinders` uses `.select('*, binder_cards(count)')` so each binder arrives with `binder.binder_cards[0].count`; also exports `duplicateBinder`
 - `cardService.js` — CRUD for `binder_cards`; `addCard` does delete-then-insert (not upsert) to avoid silent RLS failures on conflict
 - `cardService.js:swapCards` uses slot index `-1` as a sentinel to work around the `UNIQUE(binder_id, slot_index)` constraint during the 3-step swap
-- `searchService.js` — calls Pokémon TCG API v2 from the browser; has a 15-min TTL localStorage cache (60-entry limit), 24-hour set cache, recent-search history (6 entries), and a `sortBy` parameter (`''|'name'|'number'|'price_desc'|'price_asc'`)
+- `searchService.js` — calls Pokémon TCG API v2 from the browser; has a 15-min TTL localStorage cache (60-entry limit), 24-hour set cache, recent-search history (6 entries), and a `sortBy` parameter (`''|'name'|'number'|'price_desc'|'price_asc'`); exports `getSetCards(setId, sort)` which fetches up to 250 cards per set in one request, sorted client-side via `sortSetCards()` with natural number parsing via `parseCardNumber()` (regex extracts leading digits from strings like "TG01", "SV001")
 - `statsService.js` — one Supabase FK-embedded query (`binders` + `binder_cards`), aggregated client-side; returns `{ totalBinders, totalCards, totalValue, topSets, binderValues, mostValuable, recentlyAdded }`
 
 ### Key architectural decisions
@@ -86,11 +92,13 @@ RLS is enabled on all three tables — policies enforce users can only access th
 
 **AuthContext bootstrap** — `getSession()` is called once on mount (reads localStorage, no network call for fresh tokens) to set initial auth state. `onAuthStateChange` handles subsequent events but skips `INITIAL_SESSION` to avoid double-processing. An 8-second fallback calls `setLoading(false)` if Supabase never responds. `ensureProfile()` auto-creates a profile row on first sign-in.
 
-**User settings** — Persisted in localStorage under key `pokemonBinderSettings` as `{ backgroundTheme: string, currency: 'USD'|'EUR'|'GBP' }`. Read by `SettingsPage`, `StatsPage`, `BinderView`, and `SetsPage` directly from localStorage — not stored in the DB or passed as props from `App.jsx`.
+**User settings** — Persisted in localStorage under key `pokemonBinderSettings` as `{ backgroundTheme: string, currency: 'USD'|'EUR'|'GBP' }`. Read by `SettingsPage`, `StatsPage`, `BinderView`, and `SetsPage` directly from localStorage — not stored in the DB or passed as props from `App.jsx`. Currency preference is localStorage-only (no `currency` column in `profiles` table); resets if localStorage is cleared.
+
+**Header nav** — When `view === 'binders'` (the main dashboard), `App.jsx` renders a `.header-nav` bar below the title with Browse Sets and Statistics as permanent link buttons. These are NOT inside the UserMenu dropdown. `UserMenu` only has Settings, Statistics (redundant shortcut), and Sign out.
 
 **Theme system** — `BACKGROUND_THEMES` in `src/constants/themes.js` has shape `{ [key]: { name: string, css: string } }` where `css` is any valid CSS `background` value (supports `radial-gradient`, multi-stop). `App.jsx` applies it to `document.body.style.background`. The auth pages have their own fixed dark background defined in `.auth-page` CSS and are not affected by the theme.
 
-**BinderView view modes** — `BinderView` manages a local `viewMode` state (`'page'|'spread'|'gallery'`). Page mode fits the grid to viewport height using `height: calc(100vh - 265px)` and removes `aspect-ratio` from card slots. Spread mode shows two pages side by side as a book. Gallery mode renders all filled cards in a continuous responsive grid without page separators.
+**BinderView view modes** — `BinderView` manages a local `viewMode` state (`'page'|'spread'|'gallery'`). Page mode is scrollable — cards keep their `aspect-ratio: 2.5/3.5` and the page grows naturally without a height cap. Spread mode shows two pages side by side with a `.binder-spread__spine` divider. Gallery mode renders all filled cards in a continuous auto-fill responsive grid without page separators. Toggle icons: `LayoutGrid` (page), `Columns` (spread), `Images` (gallery).
 
 **Cover image upload** — `EditBinderCover` holds a `File` in local state and passes it up via `onSave(coverData, imageFile)`. `App.jsx:uploadBinderCover()` uploads to Supabase Storage bucket `binder-covers` and stores the public URL.
 
@@ -122,3 +130,35 @@ RLS is enabled on all three tables — policies enforce users can only access th
 ## Git Branch Structure
 
 `main` is production. `dev` is the active integration branch. Feature branches are cut from `dev`.
+
+---
+
+## Feature Accessibility Checklist
+
+After implementing or modifying any feature, always verify it is **reachable by the user** in the live app. A feature that exists in code but is not wired up or pushed is invisible to the user.
+
+Before declaring a feature done, confirm ALL of the following:
+
+1. **Component exists** — the `.jsx` file is created and complete
+2. **Imported in App.jsx** — the component is imported at the top of `App.jsx`
+3. **Routed or rendered** — the component is either added as a `<Route>` (for pages) or conditionally rendered inside `Dashboard` (for views like `binderView`)
+4. **Linked from UI** — the user has a button/link to reach it (header nav, UserMenu, or in-page trigger)
+5. **CSS classes exist** — any new class names used in JSX have matching rules in `App.css`
+6. **Committed and pushed** — `git push origin <branch>` was run; verify with `git log origin/<branch>..<branch>`
+
+If any step is missing, the feature is not accessible — do not mark it complete.
+
+---
+
+## Mistakes Log
+
+A running log of mistakes made across sessions. Future instances must read this before starting work.
+
+| # | Mistake | What went wrong | What to do instead |
+|---|---|---|---|
+| 1 | Forgot to push to origin after committing | All Phase 2 features were committed locally but never pushed. User reported features invisible on Vercel. | Always run `git push origin <branch>` after committing. If user says "I don't see the changes", check `git log origin/dev..dev` before assuming a code bug. |
+| 2 | New npm package not committed to package.json | Installed `recharts` locally but never staged `package.json`/`package-lock.json`. Vercel build failed with "module not found". | Stage `package.json` and `package-lock.json` in the same commit as the code that uses the new package. |
+| 3 | Applied `background-clip: text` gradient to entire `<h1>` | The heading contained a Lucide SVG icon. The gradient made the icon fully transparent. | Wrap only the text node in a `<span className="brand-text">`, never the parent element that contains icons. |
+| 4 | Appended CSS to App.css via bash/node -e | Shell escaping left a stray extra `}` brace that silently broke subsequent CSS rules. | Always use the Edit tool for any App.css modification — no bash appending. |
+| 5 | Started dev server without opening browser | User asked to "run the app" but only the terminal process was started. | Always run `npm run dev` AND `start chrome http://localhost:5173` together. Never just start the server. |
+| 6 | Tried to height-constrain the binder to fit the viewport | Set `height: calc(100vh - 265px)` with `aspect-ratio: unset` on card slots — cards became very small. User rejected it. | Binder page mode must be scrollable. Keep `aspect-ratio: 2.5/3.5` on card slots and let the page grow naturally. Never cap the binder height. |
