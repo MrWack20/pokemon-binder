@@ -11,6 +11,45 @@ Built by MrWack (GitHub: MrWack20). Repo: https://github.com/MrWack20/pokemon-bi
 
 ---
 
+## Roadmap
+
+**Always read `ROADMAP.md` before planning or starting any new phase or feature.** It is the single source of truth for what should be built, in what order, and why. Never propose or begin a phase without first checking which items are complete and what the next unchecked items are.
+
+`ROADMAP.md` is located at the project root. It defines 5 phases:
+- **Phase 1** — Foundation, Supabase Migration & Auth ✅ Complete
+- **Phase 2** — Core Feature Enhancements 🔄 In Progress (~60% done — see below)
+- **Phase 3** — Multi-Game Expansion via Scrydex API (GraphQL)
+- **Phase 4** — Social & Sharing Features
+- **Phase 5** — Production & Performance
+
+### Phase 2 remaining items (from ROADMAP.md)
+These roadmap items from Phase 2 are NOT yet implemented:
+
+**2.1 Search & Discovery:**
+- Autocomplete/suggestions as user types
+- Set completion tracking (cards in binder vs total in set)
+- Search history synced to Supabase (currently localStorage-only)
+
+**2.2 Statistics:**
+- Collection growth over time chart
+- Supabase database views for statistics queries
+
+**2.3 Binder Experience:**
+- Binder export as image/PDF
+- Quick fill (auto-populate from a set)
+- Page reordering within a binder
+- Multi-select move/remove
+- Undo/redo for card placement
+
+**2.4 Pricing:**
+- Price trend history (`price_history` table)
+- Currency preference saved to DB (currently localStorage-only)
+- Total page value displayed on each binder page
+
+When planning next steps, always complete remaining Phase 2 items before moving to Phase 3.
+
+---
+
 ## Commands
 
 ```bash
