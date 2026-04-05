@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, Cell,
+  ResponsiveContainer, Cell, AreaChart, Area, CartesianGrid,
 } from 'recharts';
 import { ArrowLeft, TrendingUp, Package, DollarSign, BookOpen, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -132,6 +132,29 @@ export default function StatsPage() {
                   color="#a78bfa"
                 />
               </div>
+
+              {/* Growth over time */}
+              {stats.growthOverTime?.length >= 2 && (
+                <div className="card stats-chart-card" style={{ marginBottom: '20px' }}>
+                  <h3>Collection Growth</h3>
+                  <p className="stats-chart-card__sub">Total cards in your collection over time</p>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <AreaChart data={stats.growthOverTime} margin={{ top: 8, right: 8, left: -10, bottom: 40 }}>
+                      <defs>
+                        <linearGradient id="growthGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+                      <XAxis dataKey="label" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 11 }} angle={-35} textAnchor="end" interval={0} />
+                      <YAxis tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip content={<ChartTooltip symbol="" />} />
+                      <Area type="monotone" dataKey="total" name="Total Cards" stroke="#3b82f6" fill="url(#growthGrad)" strokeWidth={2} dot={{ fill: '#3b82f6', r: 3 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
 
               {/* Charts row */}
               {(stats.topSets.length > 0 || stats.binderValues.length > 0) && (

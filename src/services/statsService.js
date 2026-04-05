@@ -63,8 +63,23 @@ export async function getCollectionStats(profileId) {
     .sort((a, b) => new Date(b.added_at) - new Date(a.added_at))
     .slice(0, 8);
 
+  // Collection growth over time (cards added per month, with cumulative total)
+  const monthMap = {};
+  allCards.forEach(c => {
+    if (!c.added_at) return;
+    const d = new Date(c.added_at);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    if (!monthMap[key]) monthMap[key] = { key, label, count: 0 };
+    monthMap[key].count++;
+  });
+  let cumulative = 0;
+  const growthOverTime = Object.values(monthMap)
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map(m => { cumulative += m.count; return { label: m.label, added: m.count, total: cumulative }; });
+
   return {
-    data: { totalBinders, totalCards, totalValue, topSets, binderValues, mostValuable, recentlyAdded },
+    data: { totalBinders, totalCards, totalValue, topSets, binderValues, mostValuable, recentlyAdded, growthOverTime },
     error: null,
   };
 }

@@ -66,6 +66,26 @@ export async function moveCard(cardId, newSlotIndex) {
 }
 
 /**
+ * Return a Set of all card_api_id values owned by a profile across all binders.
+ * Used for set completion tracking.
+ */
+export async function getOwnedApiIds(profileId) {
+  const { data: binders, error: be } = await supabase
+    .from('binders')
+    .select('id')
+    .eq('profile_id', profileId);
+  if (be || !binders?.length) return { data: new Set(), error: be };
+
+  const binderIds = binders.map(b => b.id);
+  const { data, error } = await supabase
+    .from('binder_cards')
+    .select('card_api_id')
+    .in('binder_id', binderIds);
+
+  return { data: new Set((data || []).map(c => c.card_api_id)), error };
+}
+
+/**
  * Swap two cards between their slots using a temporary sentinel slot (-1)
  * to avoid the unique constraint during the three-step move.
  */

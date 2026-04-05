@@ -1738,6 +1738,7 @@ input[type="number"].input::-webkit-outer-spin-button {
 
 .sets-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px; margin-bottom: 24px; }
 .sets-browse-card {
+  position: relative;
   background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.07);
   border-radius: 12px; padding: 10px; cursor: pointer; text-align: center;
   transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
@@ -1748,6 +1749,18 @@ input[type="number"].input::-webkit-outer-spin-button {
 .sets-browse-card__number { font-size: 0.7rem; opacity: 0.4; margin-bottom: 4px; }
 .sets-browse-card__price { font-size: 0.82rem; font-weight: 700; color: #10b981; }
 .sets-browse-card__no-price { font-size: 0.72rem; opacity: 0.3; }
+.sets-browse-card--owned { outline: 2px solid rgba(16,185,129,0.5); }
+.sets-browse-card__owned-badge {
+  display: flex; align-items: center; gap: 3px;
+  position: absolute; top: 6px; left: 6px;
+  background: rgba(16,185,129,0.85); color: #fff;
+  font-size: 0.65rem; font-weight: 700; padding: 2px 6px;
+  border-radius: 6px; pointer-events: none;
+}
+.set-detail-owned {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.82rem; color: #10b981; margin-top: 6px; font-weight: 600;
+}
 .sets-card-pagination { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 16px 0; }
 
 /* ── Responsive overrides ────────────────────────────────────────────────── */

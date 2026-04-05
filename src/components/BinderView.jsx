@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Edit2, ChevronLeft, ChevronRight, Filter, X, Search,
   Plus, GripVertical, SortAsc, Clock, LayoutGrid, Columns, Images,
@@ -163,6 +163,17 @@ export default function BinderView({
     const n = parseInt(jumpInput, 10);
     if (!isNaN(n) && n >= 1 && n <= totalPages) { onPageChange(n - 1); setJumpInput(''); }
   }
+
+  // Keep latest filters in a ref so the debounce always uses current values
+  const filtersRef = useRef(searchFilters);
+  useEffect(() => { filtersRef.current = searchFilters; });
+
+  // Auto-search after 500 ms when user types 3+ characters
+  useEffect(() => {
+    if (!searchIsOpen || !searchQuery.trim() || searchQuery.trim().length < 3) return;
+    const t = setTimeout(() => onSearch(searchQuery, filtersRef.current, 1), 500);
+    return () => clearTimeout(t);
+  }, [searchQuery, searchIsOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = () => onSearch(searchQuery, searchFilters, 1);
   const clearFilters  = () => onFilterChange({ set: '', type: '', rarity: '', supertype: '', language: '' });

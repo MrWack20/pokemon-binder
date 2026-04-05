@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, X, RefreshCw, Layers, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Search, X, RefreshCw, Layers, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { getSets, getSetCards } from '../services/searchService.js';
+import { getOwnedApiIds } from '../services/cardService.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
 import CardDetailModal from './CardDetailModal.jsx';
 
 function getStoredCurrency() {
@@ -13,6 +15,7 @@ const CURRENCY_SYMBOL = { USD: '$', EUR: '€', GBP: '£' };
 
 export default function SetsPage() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const currency = getStoredCurrency();
   const symbol = CURRENCY_SYMBOL[currency] || '$';
 
@@ -29,6 +32,9 @@ export default function SetsPage() {
   const [loadingCards, setLoadingCards] = useState(false);
   const [cardSort, setCardSort] = useState('number');
 
+  // Ownership tracking
+  const [ownedIds, setOwnedIds] = useState(new Set());
+
   const [modalCard, setModalCard] = useState(null);
 
   useEffect(() => {
@@ -37,6 +43,13 @@ export default function SetsPage() {
       setLoadingSets(false);
     });
   }, []);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    getOwnedApiIds(profile.id).then(({ data }) => {
+      if (data) setOwnedIds(data);
+    });
+  }, [profile?.id]);
 
   const seriesList = useMemo(() => {
     const seen = new Set();
@@ -198,6 +211,16 @@ export default function SetsPage() {
                   <p className="set-detail-meta">
                     {selectedSet.printedTotal ?? selectedSet.total} cards &middot; Released {selectedSet.releaseDate}
                   </p>
+                  {ownedIds.size > 0 && cards.length > 0 && (() => {
+                    const ownedCount = cards.filter(c => ownedIds.has(c.id)).length;
+                    const total = selectedSet.printedTotal ?? selectedSet.total;
+                    return ownedCount > 0 ? (
+                      <p className="set-detail-owned">
+                        <CheckCircle2 size={14} />
+                        {ownedCount} / {total} owned ({Math.round(ownedCount / total * 100)}%)
+                      </p>
+                    ) : null;
+                  })()}
                 </div>
                 <div className="set-detail-sort">
                   <label style={{ fontSize: '0.8rem', opacity: 0.55, whiteSpace: 'nowrap' }}>Sort by</label>
@@ -229,8 +252,10 @@ export default function SetsPage() {
                       ?? card.tcgplayer?.prices?.normal?.market
                       ?? card.tcgplayer?.prices?.['1stEditionHolofoil']?.market
                       ?? card.tcgplayer?.prices?.unlimited?.market;
+                    const owned = ownedIds.has(card.id);
                     return (
-                      <div key={card.id} className="sets-browse-card" onClick={() => setModalCard(card)}>
+                      <div key={card.id} className={`sets-browse-card${owned ? ' sets-browse-card--owned' : ''}`} onClick={() => setModalCard(card)}>
+                        {owned && <span className="sets-browse-card__owned-badge"><CheckCircle2 size={12} />Owned</span>}
                         <img src={card.images.small} alt={card.name} loading="lazy" />
                         <p className="sets-browse-card__name">{card.name}</p>
                         <p className="sets-browse-card__number">#{card.number}</p>
