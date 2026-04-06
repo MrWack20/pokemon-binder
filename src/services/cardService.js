@@ -1,25 +1,12 @@
 import { supabase, ensureValidSession } from '../supabase.js';
 
 export async function getBinderCards(binderId) {
+  await ensureValidSession();
   const { data, error } = await supabase
     .from('binder_cards')
     .select('*')
     .eq('binder_id', binderId)
     .order('slot_index', { ascending: true });
-
-  // RLS returns [] on expired JWT — retry once after refreshing session
-  if (!error && data && data.length === 0) {
-    const session = await ensureValidSession();
-    if (session) {
-      const retry = await supabase
-        .from('binder_cards')
-        .select('*')
-        .eq('binder_id', binderId)
-        .order('slot_index', { ascending: true });
-      return { data: retry.data, error: retry.error };
-    }
-  }
-
   return { data, error };
 }
 
@@ -80,6 +67,7 @@ export async function moveCard(cardId, newSlotIndex) {
  * Return a Set of all card_api_id values owned by a profile across all binders.
  */
 export async function getOwnedApiIds(profileId) {
+  await ensureValidSession();
   const { data: binders, error: be } = await supabase
     .from('binders')
     .select('id')

@@ -24,21 +24,17 @@ export const supabase = createClient(
 );
 
 /**
- * Ensure we have a valid session before making authenticated requests.
- * Browsers throttle timers in background tabs, so Supabase's auto-refresh
- * might not fire on time. This forces a session check + refresh if needed.
- *
- * Call this before any critical DB operation.
- * Returns the current session or null if truly unauthenticated.
+ * Ensure we have a valid session. Calls getSession() which triggers an
+ * internal refresh if the JWT is expired. Has a 5-second timeout so it
+ * can never hang the UI.
  */
 export async function ensureValidSession() {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) return session;
-
-    // No session in memory — try refreshing
-    const { data: { session: refreshed } } = await supabase.auth.refreshSession();
-    return refreshed ?? null;
+    const result = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Session check timeout')), 5000)),
+    ]);
+    return result.data?.session ?? null;
   } catch {
     return null;
   }
