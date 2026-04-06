@@ -19,8 +19,27 @@ export const supabase = createClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      // DO NOT set a custom storageKey — it breaks existing sessions.
-      // Supabase default: sb-<project-ref>-auth-token
     },
   }
 );
+
+/**
+ * Ensure we have a valid session before making authenticated requests.
+ * Browsers throttle timers in background tabs, so Supabase's auto-refresh
+ * might not fire on time. This forces a session check + refresh if needed.
+ *
+ * Call this before any critical DB operation.
+ * Returns the current session or null if truly unauthenticated.
+ */
+export async function ensureValidSession() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) return session;
+
+    // No session in memory — try refreshing
+    const { data: { session: refreshed } } = await supabase.auth.refreshSession();
+    return refreshed ?? null;
+  } catch {
+    return null;
+  }
+}

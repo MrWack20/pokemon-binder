@@ -1,4 +1,4 @@
-import { supabase } from '../supabase.js';
+import { supabase, ensureValidSession } from '../supabase.js';
 
 export async function getBinderCards(binderId) {
   const { data, error } = await supabase
@@ -6,16 +6,29 @@ export async function getBinderCards(binderId) {
     .select('*')
     .eq('binder_id', binderId)
     .order('slot_index', { ascending: true });
+
+  // RLS returns [] on expired JWT — retry once after refreshing session
+  if (!error && data && data.length === 0) {
+    const session = await ensureValidSession();
+    if (session) {
+      const retry = await supabase
+        .from('binder_cards')
+        .select('*')
+        .eq('binder_id', binderId)
+        .order('slot_index', { ascending: true });
+      return { data: retry.data, error: retry.error };
+    }
+  }
+
   return { data, error };
 }
 
 /**
  * Add (or replace) a card at a specific slot.
  * Deletes any existing card in that slot first, then inserts the new one.
- * This avoids upsert RLS edge-cases where the UPDATE path can silently return null.
  */
 export async function addCard(binderId, slotIndex, cardData) {
-  // Remove any card already in this slot (ignore error if row doesn't exist)
+  await ensureValidSession();
   await supabase
     .from('binder_cards')
     .delete()
@@ -31,6 +44,7 @@ export async function addCard(binderId, slotIndex, cardData) {
 }
 
 export async function removeCard(cardId) {
+  await ensureValidSession();
   const { error } = await supabase
     .from('binder_cards')
     .delete()
@@ -38,10 +52,8 @@ export async function removeCard(cardId) {
   return { error };
 }
 
-/**
- * Move a card to a new empty slot. Clears the target slot first, then updates slot_index.
- */
 export async function moveCard(cardId, newSlotIndex) {
+  await ensureValidSession();
   const { data: card, error: fetchError } = await supabase
     .from('binder_cards')
     .select('*')
@@ -49,7 +61,6 @@ export async function moveCard(cardId, newSlotIndex) {
     .single();
   if (fetchError) return { data: null, error: fetchError };
 
-  // Clear any card already in the target slot
   await supabase
     .from('binder_cards')
     .delete()
@@ -67,7 +78,6 @@ export async function moveCard(cardId, newSlotIndex) {
 
 /**
  * Return a Set of all card_api_id values owned by a profile across all binders.
- * Used for set completion tracking.
  */
 export async function getOwnedApiIds(profileId) {
   const { data: binders, error: be } = await supabase
@@ -86,10 +96,10 @@ export async function getOwnedApiIds(profileId) {
 }
 
 /**
- * Swap two cards between their slots using a temporary sentinel slot (-1)
- * to avoid the unique constraint during the three-step move.
+ * Swap two cards between slots using sentinel slot -1 for the UNIQUE constraint.
  */
 export async function swapCards(cardId1, cardId2) {
+  await ensureValidSession();
   const { data: cards, error: fetchError } = await supabase
     .from('binder_cards')
     .select('id, slot_index')
