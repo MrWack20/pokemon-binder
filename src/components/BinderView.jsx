@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Edit2, ChevronLeft, ChevronRight, Filter, X, Search,
-  Plus, GripVertical, SortAsc, Clock, LayoutGrid, Columns, Images,
+  Plus, GripVertical, SortAsc, Clock, LayoutGrid, Columns, Images, Maximize2,
 } from 'lucide-react';
 import { getRecentSearches } from '../services/searchService.js';
 import {
@@ -12,17 +12,36 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 
 // ─── Card slot ────────────────────────────────────────────────────────────────
 
-function CardSlot({ absoluteIndex, card, isSelected, onSelectCell, onRemoveCard, onCardClick, isDragActive }) {
+function CardSlot({ absoluteIndex, card, isSelected, onSelectCell, onRemoveCard, onCardClick, onInspectCard, isDragActive }) {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: absoluteIndex,
     disabled: !card,
   });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: absoluteIndex });
+  const longPressRef = useRef(null);
 
   const setRef = useCallback(
     (node) => { setDragRef(node); setDropRef(node); },
     [setDragRef, setDropRef],
   );
+
+  function handlePointerDown(e) {
+    if (!card) return;
+    const startX = e.clientX, startY = e.clientY;
+    longPressRef.current = setTimeout(() => {
+      onInspectCard?.(card);
+    }, 450);
+    function cancel() {
+      clearTimeout(longPressRef.current);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', cancel);
+    }
+    function onMove(ev) {
+      if (Math.abs(ev.clientX - startX) > 6 || Math.abs(ev.clientY - startY) > 6) cancel();
+    }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', cancel);
+  }
 
   function handleClick() {
     if (isDragActive) return;
@@ -35,6 +54,7 @@ function CardSlot({ absoluteIndex, card, isSelected, onSelectCell, onRemoveCard,
       ref={setRef}
       {...(card ? attributes : {})}
       {...(card ? listeners : {})}
+      onPointerDown={handlePointerDown}
       onClick={handleClick}
       className={[
         'card-slot',
@@ -68,7 +88,7 @@ function CardSlot({ absoluteIndex, card, isSelected, onSelectCell, onRemoveCard,
 
 function BinderGrid({
   cards, startIndex, rows, cols, selectedCell, onSelectCell,
-  onRemoveCard, onCardClick, isDragActive,
+  onRemoveCard, onCardClick, onInspectCard, isDragActive,
 }) {
   return (
     <div
@@ -89,6 +109,7 @@ function BinderGrid({
             onSelectCell={onSelectCell}
             onRemoveCard={onRemoveCard}
             onCardClick={onCardClick}
+            onInspectCard={onInspectCard}
             isDragActive={isDragActive}
           />
         );
@@ -101,11 +122,11 @@ function BinderGrid({
 
 export default function BinderView({
   binder, currentPage, onPageChange, onBack, onEditCover,
-  selectedCell, onSelectCell, onRemoveCard, onCardClick,
+  selectedCell, onSelectCell, onRemoveCard, onCardClick, onInspectCard,
   searchQuery, onSearchChange, onSearch, searchResults, loading, onAddCard,
   searchFilters, onFilterChange, sets, showFilters, onToggleFilters,
   searchPage, totalSearchPages, onSearchPageChange, onSwapCards,
-  searchSort, onSortChange, currency,
+  searchSort, onSortChange, currency, searchGame, onGameChange,
 }) {
   const slotsPerPage  = binder.rows * binder.cols;
   const totalPages    = binder.pages;
@@ -271,6 +292,7 @@ export default function BinderView({
                     rows={binder.rows} cols={binder.cols}
                     selectedCell={selectedCell} onSelectCell={onSelectCell}
                     onRemoveCard={onRemoveCard} onCardClick={onCardClick}
+                    onInspectCard={onInspectCard}
                     isDragActive={activeDragId !== null}
                   />
                   <DragOverlay>
@@ -324,6 +346,7 @@ export default function BinderView({
                         rows={binder.rows} cols={binder.cols}
                         selectedCell={selectedCell} onSelectCell={onSelectCell}
                         onRemoveCard={onRemoveCard} onCardClick={onCardClick}
+                        onInspectCard={onInspectCard}
                         isDragActive={activeDragId !== null}
                       />
                     </div>
@@ -342,6 +365,7 @@ export default function BinderView({
                           rows={binder.rows} cols={binder.cols}
                           selectedCell={selectedCell} onSelectCell={onSelectCell}
                           onRemoveCard={onRemoveCard} onCardClick={onCardClick}
+                          onInspectCard={onInspectCard}
                           isDragActive={activeDragId !== null}
                         />
                       ) : (
@@ -405,17 +429,36 @@ export default function BinderView({
                 {selectedCell !== null && <span className="slot-badge">Slot {selectedCell + 1}</span>}
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => onToggleFilters(!showFilters)}
-                  className={`btn btn-secondary icon-btn${showFilters ? ' active' : ''}`}
-                  title="Filters"
-                >
-                  <Filter size={16} />
-                </button>
+                {searchGame === 'pokemon' && (
+                  <button
+                    onClick={() => onToggleFilters(!showFilters)}
+                    className={`btn btn-secondary icon-btn${showFilters ? ' active' : ''}`}
+                    title="Filters (Pokémon only)"
+                  >
+                    <Filter size={16} />
+                  </button>
+                )}
                 <button onClick={() => onSelectCell(null)} className="btn btn-secondary icon-btn" title="Close">
                   <X size={16} />
                 </button>
               </div>
+            </div>
+
+            {/* Game selector */}
+            <div className="game-selector">
+              {[
+                { id: 'pokemon', label: '🎴 Pokémon' },
+                { id: 'mtg',     label: '⚔️ MTG' },
+                { id: 'yugioh',  label: '🐉 Yu-Gi-Oh!' },
+              ].map(g => (
+                <button
+                  key={g.id}
+                  className={`game-selector__btn${searchGame === g.id ? ' active' : ''}`}
+                  onClick={() => onGameChange(g.id)}
+                >
+                  {g.label}
+                </button>
+              ))}
             </div>
 
             {recentSearches.length > 0 && !searchQuery && (
@@ -522,20 +565,22 @@ export default function BinderView({
             )}
 
             <div className="card-results drawer-results">
-              {searchResults.map(card => (
-                <div key={card.id} onClick={() => onAddCard(card)} className="search-card">
-                  <img src={card.images.small} alt={card.name} loading="lazy" />
-                  <p>{card.name}</p>
-                  <p className="text-muted" style={{ fontSize: '0.7rem', marginBottom: '4px' }}>{card.set.name}</p>
-                  {(() => {
-                    const p = card.tcgplayer?.prices?.holofoil?.market
-                      ?? card.tcgplayer?.prices?.normal?.market
-                      ?? card.tcgplayer?.prices?.['1stEditionHolofoil']?.market
-                      ?? card.tcgplayer?.prices?.unlimited?.market;
-                    return p ? <p className="price">${p.toFixed(2)}</p> : null;
-                  })()}
-                </div>
-              ))}
+              {searchResults.map(card => {
+                const p = card._price
+                  ?? card.tcgplayer?.prices?.holofoil?.market
+                  ?? card.tcgplayer?.prices?.normal?.market
+                  ?? card.tcgplayer?.prices?.['1stEditionHolofoil']?.market
+                  ?? card.tcgplayer?.prices?.unlimited?.market
+                  ?? null;
+                return (
+                  <div key={card.id} onClick={() => onAddCard(card)} className="search-card">
+                    <img src={card.images.small} alt={card.name} loading="lazy" />
+                    <p>{card.name}</p>
+                    <p className="text-muted" style={{ fontSize: '0.7rem', marginBottom: '4px' }}>{card.set.name}</p>
+                    {p != null ? <p className="price">${p.toFixed(2)}</p> : null}
+                  </div>
+                );
+              })}
             </div>
 
             {totalSearchPages > 1 && (

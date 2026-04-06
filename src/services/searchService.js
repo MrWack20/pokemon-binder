@@ -97,6 +97,18 @@ export async function searchCards(query, filters = {}, page = 1, sortBy = '') {
     }
 
     const totalPages = Math.ceil((json.totalCount || results.length) / PAGE_SIZE);
+
+    // Tag every result with _game and _price so multi-game code can use a single path
+    results = results.map(c => ({
+      ...c,
+      _game: 'pokemon',
+      _price: c.tcgplayer?.prices?.holofoil?.market
+        ?? c.tcgplayer?.prices?.normal?.market
+        ?? c.tcgplayer?.prices?.['1stEditionHolofoil']?.market
+        ?? c.tcgplayer?.prices?.unlimited?.market
+        ?? null,
+    }));
+
     writeCache({ ...cache, [cacheKey]: { results, totalPages, ts: Date.now() } });
 
     return { data: { results, totalPages }, error: null };

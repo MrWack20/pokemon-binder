@@ -14,6 +14,7 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
     coverText: '',
     coverImageFile: null,
     coverImagePreview: null,
+    defaultGame: 'pokemon',
   });
 
   const handleCreate = async () => {
@@ -27,7 +28,7 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
       coverText: binderForm.coverText,
       coverImageFile: binderForm.coverImageFile,
     });
-    setBinderForm({ name: '', rows: 3, cols: 3, pages: 10, coverColor: '#3b82f6', coverText: '', coverImageFile: null, coverImagePreview: null });
+    setBinderForm({ name: '', rows: 3, cols: 3, pages: 10, coverColor: '#3b82f6', coverText: '', coverImageFile: null, coverImagePreview: null, defaultGame: 'pokemon' });
     setShowCreate(false);
   };
 
@@ -121,6 +122,18 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
                 </span>
               )}
             </p>
+          </div>
+          <div className="form-group">
+            <label>Default Game</label>
+            <select
+              value={binderForm.defaultGame}
+              onChange={e => setBinderForm({ ...binderForm, defaultGame: e.target.value })}
+              className="input"
+            >
+              <option value="pokemon">🎴 Pokémon TCG</option>
+              <option value="mtg">⚔️ Magic: The Gathering</option>
+              <option value="yugioh">🐉 Yu-Gi-Oh!</option>
+            </select>
           </div>
           <div className="form-group">
             <label>Cover Image (Optional)</label>

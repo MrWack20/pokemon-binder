@@ -9,6 +9,7 @@ import SettingsPage from './components/SettingsPage';
 import StatsPage from './components/StatsPage';
 import SetsPage from './components/SetsPage';
 import CardDetailModal from './components/CardDetailModal';
+import CardInspectModal from './components/CardInspectModal';
 import BindersView from './components/BindersView';
 import EditBinderCover from './components/EditBinderCover';
 import BinderView from './components/BinderView';
@@ -35,6 +36,8 @@ import {
   swapCards as swapCardsSvc,
 } from './services/cardService.js';
 import { searchCards as searchCardsSvc, getSets, addRecentSearch } from './services/searchService.js';
+import { searchMtgCards, mtgCardToDbRow } from './services/mtgService.js';
+import { searchYgoCards, ygoCardToDbRow } from './services/yugiohService.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -100,7 +103,9 @@ function Dashboard() {
   const [searchPage, setSearchPage] = useState(1);
   const [totalSearchPages, setTotalSearchPages] = useState(0);
   const [searchSort, setSearchSort] = useState('');
+  const [searchGame, setSearchGame] = useState('pokemon');
   const [modalCard, setModalCard] = useState(null);
+  const [inspectCard, setInspectCard] = useState(null);
 
   // ── Settings state ───────────────────────────────────────────────────────
   const [appSettings, setAppSettings] = useState({ backgroundTheme: 'default' });
@@ -147,11 +152,21 @@ function Dashboard() {
   };
 
   // ── Search ────────────────────────────────────────────────────────────────
-  const handleSearch = async (query, filters = searchFilters, page = 1, sort = searchSort) => {
+  const handleSearch = async (query, filters = searchFilters, page = 1, sort = searchSort, game = searchGame) => {
     setLoading(true);
     setSearchResults([]);
     if (query?.trim()) addRecentSearch(query);
-    const { data, error } = await searchCardsSvc(query, filters, page, sort);
+
+    let result;
+    if (game === 'mtg') {
+      result = await searchMtgCards(query, page);
+    } else if (game === 'yugioh') {
+      result = await searchYgoCards(query, page);
+    } else {
+      result = await searchCardsSvc(query, filters, page, sort);
+    }
+
+    const { data, error } = result;
     if (error || !data) {
       setSearchResults([]);
       setTotalSearchPages(0);
@@ -249,19 +264,29 @@ function Dashboard() {
       console.warn('handleAddCard: selectedCell=', selectedCell, 'selectedBinder=', selectedBinder);
       return;
     }
-    const { data, error } = await addCard(selectedBinder.id, selectedCell, {
-      card_api_id: apiCard.id,
-      card_name: apiCard.name,
-      card_image_url: apiCard.images?.small ?? apiCard.images?.large ?? '',
-      card_set: apiCard.set?.name ?? null,
-      card_game: 'pokemon',
-      card_price: apiCard.tcgplayer?.prices?.holofoil?.market
-        ?? apiCard.tcgplayer?.prices?.normal?.market
-        ?? apiCard.tcgplayer?.prices?.['1stEditionHolofoil']?.market
-        ?? apiCard.tcgplayer?.prices?.unlimited?.market
-        ?? null,
-      card_price_currency: 'USD',
-    });
+    const game = apiCard._game ?? 'pokemon';
+    let dbRow;
+    if (game === 'mtg') {
+      dbRow = mtgCardToDbRow(apiCard);
+    } else if (game === 'yugioh') {
+      dbRow = ygoCardToDbRow(apiCard);
+    } else {
+      dbRow = {
+        card_api_id: apiCard.id,
+        card_name: apiCard.name,
+        card_image_url: apiCard.images?.small ?? apiCard.images?.large ?? '',
+        card_set: apiCard.set?.name ?? null,
+        card_game: 'pokemon',
+        card_price: apiCard._price
+          ?? apiCard.tcgplayer?.prices?.holofoil?.market
+          ?? apiCard.tcgplayer?.prices?.normal?.market
+          ?? apiCard.tcgplayer?.prices?.['1stEditionHolofoil']?.market
+          ?? apiCard.tcgplayer?.prices?.unlimited?.market
+          ?? null,
+        card_price_currency: 'USD',
+      };
+    }
+    const { data, error } = await addCard(selectedBinder.id, selectedCell, dbRow);
     if (error || !data) {
       console.error('addCard error:', error);
       toast.error(`Failed to add card: ${error?.message ?? 'unknown error'}`);
@@ -386,13 +411,14 @@ function Dashboard() {
               setSelectedBinder(null);
               setCurrentPage(0);
               setView('binders');
-              loadBinders(); // refresh card counts in binder list
+              loadBinders();
             }}
             onEditCover={() => setView('editBinder')}
             selectedCell={selectedCell}
             onSelectCell={setSelectedCell}
             onRemoveCard={handleRemoveCard}
             onCardClick={setModalCard}
+            onInspectCard={setInspectCard}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onSearch={handleSearch}
@@ -406,10 +432,12 @@ function Dashboard() {
             onToggleFilters={setShowFilters}
             searchPage={searchPage}
             totalSearchPages={totalSearchPages}
-            onSearchPageChange={(page) => handleSearch(searchQuery, searchFilters, page, searchSort)}
+            onSearchPageChange={(page) => handleSearch(searchQuery, searchFilters, page, searchSort, searchGame)}
             onSwapCards={handleSwapCards}
             searchSort={searchSort}
-            onSortChange={(sort) => { setSearchSort(sort); handleSearch(searchQuery, searchFilters, 1, sort); }}
+            onSortChange={(sort) => { setSearchSort(sort); handleSearch(searchQuery, searchFilters, 1, sort, searchGame); }}
+            searchGame={searchGame}
+            onGameChange={(game) => { setSearchGame(game); setSearchResults([]); setSearchQuery(''); }}
             currency={(() => { try { return JSON.parse(localStorage.getItem('pokemonBinderSettings') || '{}').currency || 'USD'; } catch { return 'USD'; } })()}
           />
         )}
@@ -427,11 +455,19 @@ function Dashboard() {
             card={modalCard}
             currency={(() => { try { return JSON.parse(localStorage.getItem('pokemonBinderSettings') || '{}').currency || 'USD'; } catch { return 'USD'; } })()}
             onClose={() => setModalCard(null)}
+            onInspect={(card) => { setModalCard(null); setInspectCard(card); }}
             onRemove={() => {
               const slotIndex = selectedBinder?.cards.findIndex(c => c?.id === modalCard.id);
               if (slotIndex !== undefined && slotIndex !== -1) handleRemoveCard(slotIndex);
               setModalCard(null);
             }}
+          />
+        )}
+
+        {inspectCard && (
+          <CardInspectModal
+            card={inspectCard}
+            onClose={() => setInspectCard(null)}
           />
         )}
       </div>

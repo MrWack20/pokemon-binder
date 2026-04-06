@@ -78,8 +78,21 @@ export async function getCollectionStats(profileId) {
     .sort((a, b) => a.key.localeCompare(b.key))
     .map(m => { cumulative += m.count; return { label: m.label, added: m.count, total: cumulative }; });
 
+  // Per-game breakdown
+  const gameMap = {};
+  allCards.forEach(c => {
+    const g = c.card_game || 'pokemon';
+    if (!gameMap[g]) gameMap[g] = { game: g, count: 0, value: 0 };
+    gameMap[g].count++;
+    gameMap[g].value += c.card_price || 0;
+  });
+  const GAME_LABELS = { pokemon: 'Pokémon', mtg: 'Magic: TG', yugioh: 'Yu-Gi-Oh!' };
+  const gameBreakdown = Object.values(gameMap)
+    .sort((a, b) => b.count - a.count)
+    .map(g => ({ ...g, label: GAME_LABELS[g.game] || g.game, value: +g.value.toFixed(2) }));
+
   return {
-    data: { totalBinders, totalCards, totalValue, topSets, binderValues, mostValuable, recentlyAdded, growthOverTime },
+    data: { totalBinders, totalCards, totalValue, topSets, binderValues, mostValuable, recentlyAdded, growthOverTime, gameBreakdown },
     error: null,
   };
 }

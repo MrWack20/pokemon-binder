@@ -272,6 +272,23 @@ export default function StatsPage() {
 
               </div>
 
+              {/* Per-game breakdown */}
+              {stats.gameBreakdown?.length > 1 && (
+                <div className="card stats-chart-card" style={{ marginBottom: '20px' }}>
+                  <h3>Collection by Game</h3>
+                  <p className="stats-chart-card__sub">Cards and value across TCG games</p>
+                  <div className="stats-game-row">
+                    {stats.gameBreakdown.map((g, i) => (
+                      <div key={g.game} className="stats-game-card" style={{ borderColor: CHART_COLORS[i % CHART_COLORS.length] }}>
+                        <p className="stats-game-card__label">{g.label}</p>
+                        <p className="stats-game-card__count">{g.count.toLocaleString()} cards</p>
+                        {g.value > 0 && <p className="stats-game-card__value">{symbol}{g.value.toFixed(2)}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Empty state */}
               {stats.totalCards === 0 && (
                 <div className="card" style={{ textAlign: 'center', padding: '60px 20px' }}>

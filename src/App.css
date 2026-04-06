@@ -1878,3 +1878,108 @@ input[type="number"].input::-webkit-outer-spin-button {
     text-align: center;
   }
 }
+
+/* ── Game selector (BinderView search drawer) ────────────────────────────── */
+.game-selector {
+  display: flex; gap: 6px; padding: 0 0 12px 0;
+}
+.game-selector__btn {
+  flex: 1; padding: 7px 4px; border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px; background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.6); font-size: 0.78rem; cursor: pointer;
+  transition: all 0.15s; white-space: nowrap;
+}
+.game-selector__btn:hover { background: rgba(255,255,255,0.1); color: white; }
+.game-selector__btn.active { background: rgba(59,130,246,0.25); border-color: rgba(59,130,246,0.5); color: #93c5fd; font-weight: 600; }
+
+/* ── CardDetailModal game badge + inspect button ─────────────────────────── */
+.modal-game-badge {
+  font-size: 0.75rem; opacity: 0.55; margin-bottom: 8px; font-weight: 500;
+}
+.modal-inspect-btn {
+  display: flex; align-items: center; gap: 6px; justify-content: center;
+  width: 100%; margin-top: 10px; font-size: 0.82rem;
+}
+
+/* ── CardInspectModal — 3D inspection overlay ────────────────────────────── */
+.inspect-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(12px);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 2000; cursor: pointer;
+}
+.inspect-controls {
+  display: flex; align-items: center; justify-content: space-between;
+  width: min(420px, 90vw); margin-bottom: 20px;
+  cursor: default;
+}
+.inspect-card-name {
+  font-size: 1rem; font-weight: 600; color: rgba(255,255,255,0.85);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 260px;
+}
+.inspect-btn {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.7); cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.inspect-btn:hover { background: rgba(255,255,255,0.2); color: white; }
+.inspect-btn--close { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3); }
+.inspect-btn--close:hover { background: rgba(239,68,68,0.35); color: #fca5a5; }
+
+.inspect-stage {
+  cursor: default; user-select: none;
+  filter: drop-shadow(0 30px 80px rgba(0,0,0,0.7));
+  will-change: transform;
+}
+.inspect-card-wrap {
+  position: relative;
+  transition: transform 0.06s ease;
+  border-radius: 16px;
+}
+.inspect-card-img {
+  display: block;
+  width: min(360px, 80vw);
+  border-radius: 16px;
+  pointer-events: none;
+}
+.inspect-shine {
+  position: absolute; inset: 0;
+  border-radius: 16px;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  transition: background 0.06s ease;
+}
+.inspect-gloss {
+  position: absolute; inset: 0;
+  border-radius: 16px;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 50%, rgba(0,0,0,0.1) 100%);
+}
+.inspect-hint {
+  margin-top: 18px; font-size: 0.75rem;
+  opacity: 0.35; color: white; text-align: center;
+  cursor: default;
+}
+
+/* ── Per-game stats breakdown ────────────────────────────────────────────── */
+.stats-game-row {
+  display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px;
+}
+.stats-game-card {
+  flex: 1; min-width: 120px; padding: 14px 16px;
+  background: rgba(255,255,255,0.05); border: 1.5px solid;
+  border-radius: 12px;
+}
+.stats-game-card__label { font-size: 0.78rem; opacity: 0.55; margin-bottom: 6px; }
+.stats-game-card__count { font-size: 1.1rem; font-weight: 700; margin-bottom: 2px; }
+.stats-game-card__value { font-size: 0.85rem; color: #10b981; font-weight: 600; }
+
+/* ── Modal meta rows for long text (YGO effect text, MTG oracle) ─────────── */
+.modal-meta-row__value {
+  white-space: pre-wrap; word-break: break-word;
+}
