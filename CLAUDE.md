@@ -17,10 +17,10 @@ Built by MrWack (GitHub: MrWack20). Repo: https://github.com/MrWack20/pokemon-bi
 
 `ROADMAP.md` is located at the project root. It defines 5 phases:
 - **Phase 1** — Foundation, Supabase Migration & Auth ✅ Complete
-- **Phase 2** — Core Feature Enhancements 🔄 In Progress (~60% done — see below)
-- **Phase 3** — Multi-Game Expansion via Scrydex API (GraphQL)
-- **Phase 4** — Social & Sharing Features
-- **Phase 5** — Production & Performance
+- **Phase 2** — Core Feature Enhancements ✅ Complete (core items done; stretch items deferred to Phase 5)
+- **Phase 3** — Multi-Game Expansion ✅ Complete (Scryfall + YGOPRODeck; see notes below)
+- **Phase 4** — Social & Sharing Features 🔲 Next
+- **Phase 5** — Production & Performance 🔲 Pending
 
 ### Phase 2 remaining items (from ROADMAP.md)
 These roadmap items from Phase 2 are NOT yet implemented:
@@ -46,7 +46,32 @@ These roadmap items from Phase 2 are NOT yet implemented:
 - Currency preference saved to DB (currently localStorage-only)
 - Total page value displayed on each binder page
 
-When planning next steps, always complete remaining Phase 2 items before moving to Phase 3.
+### Phase 3 notes
+The roadmap referenced "Scrydex API (GraphQL)" — this API does not exist as a production service. Phase 3 was implemented using:
+- **Scryfall API** (REST) for Magic: The Gathering — `src/services/mtgService.js`
+- **YGOPRODeck API** (REST) for Yu-Gi-Oh! — `src/services/yugiohService.js`
+- No GraphQL client was needed; both APIs are REST with CORS support, no auth required.
+
+New services normalize all game cards to a shared display shape: `{ id, name, images: { small, large }, set: { name }, _game, _price, _raw }`. This shape is compatible with the existing Pokemon TCG API shape so BinderView requires minimal changes.
+
+`binder_cards.card_game` column already existed from Phase 1. The only new DB column is `binders.default_game` — requires running `supabase/migrations/002_phase3_multigame.sql`.
+
+**3D card inspection** — `CardInspectModal.jsx`:
+- Triggered by long-pressing (450ms hold) any card in the binder
+- Also accessible via "Inspect 3D" button in CardDetailModal
+- CSS `perspective() + rotateX/rotateY` driven by mouse/touch position
+- Holographic shine overlay with `mix-blend-mode: screen`
+- Flip button for double-faced MTG cards (`card._backImage`)
+
+### Phase 2 remaining stretch items (deferred)
+- Binder export as image/PDF (needs html2canvas + jsPDF)
+- Page reordering within a binder
+- Multi-select move/remove
+- Undo/redo for card placement
+- Currency preference saved to DB (localStorage-only)
+- Price trend history (needs `price_history` table)
+
+When planning next steps, proceed to Phase 4 (Social & Sharing).
 
 ---
 
@@ -119,7 +144,9 @@ RLS is enabled on all three tables — policies enforce users can only access th
 - `cardService.js` — CRUD for `binder_cards`; `addCard` does delete-then-insert (not upsert) to avoid silent RLS failures on conflict
 - `cardService.js:swapCards` uses slot index `-1` as a sentinel to work around the `UNIQUE(binder_id, slot_index)` constraint during the 3-step swap
 - `searchService.js` — calls Pokémon TCG API v2 from the browser; has a 15-min TTL localStorage cache (60-entry limit), 24-hour set cache, recent-search history (6 entries), and a `sortBy` parameter (`''|'name'|'number'|'price_desc'|'price_asc'`); exports `getSetCards(setId, sort)` which fetches up to 250 cards per set in one request, sorted client-side via `sortSetCards()` with natural number parsing via `parseCardNumber()` (regex extracts leading digits from strings like "TG01", "SV001")
-- `statsService.js` — one Supabase FK-embedded query (`binders` + `binder_cards`), aggregated client-side; returns `{ totalBinders, totalCards, totalValue, topSets, binderValues, mostValuable, recentlyAdded }`
+- `statsService.js` — one Supabase FK-embedded query (`binders` + `binder_cards`), aggregated client-side; returns `{ totalBinders, totalCards, totalValue, topSets, binderValues, mostValuable, recentlyAdded, growthOverTime, gameBreakdown }`
+- `mtgService.js` — Scryfall REST API for MTG; `searchMtgCards(query, page)` returns normalized cards; `normalizeMtgCard(raw)` maps Scryfall → shared display shape; `mtgCardToDbRow(card)` maps to binder_cards columns
+- `yugiohService.js` — YGOPRODeck API for Yu-Gi-Oh!; same pattern as mtgService; returns 400 (not 404) for empty results — handled as empty array
 
 ### Key architectural decisions
 
@@ -201,3 +228,4 @@ A running log of mistakes made across sessions. Future instances must read this 
 | 4 | Appended CSS to App.css via bash/node -e | Shell escaping left a stray extra `}` brace that silently broke subsequent CSS rules. | Always use the Edit tool for any App.css modification — no bash appending. |
 | 5 | Started dev server without opening browser | User asked to "run the app" but only the terminal process was started. | Always run `npm run dev` AND `start chrome http://localhost:5173` together. Never just start the server. |
 | 6 | Tried to height-constrain the binder to fit the viewport | Set `height: calc(100vh - 265px)` with `aspect-ratio: unset` on card slots — cards became very small. User rejected it. | Binder page mode must be scrollable. Keep `aspect-ratio: 2.5/3.5` on card slots and let the page grow naturally. Never cap the binder height. |
+| 7 | Planned to use "Scrydex API" for Phase 3 multi-game | Scrydex does not exist as a production API. | Use Scryfall (MTG) and YGOPRODeck (YGO) — both are free REST APIs, no auth, CORS-safe. |
