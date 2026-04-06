@@ -14,7 +14,7 @@ import CardInspectModal from './components/CardInspectModal';
 import BindersView from './components/BindersView';
 import EditBinderCover from './components/EditBinderCover';
 import BinderView from './components/BinderView';
-import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
+import { AuthProvider, useAuth, getCachedBinders, cacheBinders } from './contexts/AuthContext.jsx';
 import ProtectedRoute from './components/Auth/ProtectedRoute.jsx';
 import LoginPage from './components/Auth/LoginPage.jsx';
 import RegisterPage from './components/Auth/RegisterPage.jsx';
@@ -97,7 +97,7 @@ function Dashboard() {
 
   // ── View state ──────────────────────────────────────────────────────────────
   const [view, setView] = useState('binders');
-  const [binders, setBinders] = useState([]);
+  const [binders, setBinders] = useState(() => getCachedBinders() || []);
   const [selectedBinder, setSelectedBinder] = useState(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -171,6 +171,7 @@ function Dashboard() {
         return { error };
       }
       setBinders(data || []);
+      cacheBinders(data || []);
       setSyncing(false);
       return { error: null };
     } catch (err) {
@@ -240,10 +241,11 @@ function Dashboard() {
         data.cover_image_url = url;
       }
     }
-    setBinders(prev => [
-      ...prev,
-      { ...data, cards: Array(data.rows * data.cols * data.pages).fill(null) },
-    ]);
+    setBinders(prev => {
+      const next = [...prev, { ...data, cards: Array(data.rows * data.cols * data.pages).fill(null) }];
+      cacheBinders(next);
+      return next;
+    });
     toast.success(`Binder "${data.name}" created!`);
     setSyncing(false);
   };
@@ -263,7 +265,11 @@ function Dashboard() {
     setSyncing(true);
     const { error } = await deleteBinderSvc(binderId);
     if (error) { toast.error('Failed to delete binder.'); setSyncing(false); return; }
-    setBinders(prev => prev.filter(b => b.id !== binderId));
+    setBinders(prev => {
+      const next = prev.filter(b => b.id !== binderId);
+      cacheBinders(next);
+      return next;
+    });
     toast.success('Binder deleted.');
     setSyncing(false);
   };
@@ -272,7 +278,11 @@ function Dashboard() {
     setSyncing(true);
     const { data, error } = await duplicateBinderSvc(binderId);
     if (error || !data) { toast.error('Failed to duplicate binder.'); setSyncing(false); return; }
-    setBinders(prev => [...prev, { ...data, binder_cards: [{ count: 0 }] }]);
+    setBinders(prev => {
+      const next = [...prev, { ...data, binder_cards: [{ count: 0 }] }];
+      cacheBinders(next);
+      return next;
+    });
     toast.success(`"${binderName}" duplicated.`);
     setSyncing(false);
   };

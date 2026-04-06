@@ -10,64 +10,107 @@ import { getProfile, createProfile } from '../services/profileService.js';
 
 const AuthContext = createContext(null);
 
-const PROFILE_RETRY_DELAY = 2000;
-const PROFILE_MAX_RETRIES = 3;
+const PROFILE_CACHE_KEY = 'pkb_profile_cache';
+const BINDERS_CACHE_KEY = 'pkb_binders_cache';
+
+/**
+ * Read cached profile from sessionStorage.
+ * Provides instant data on refresh while we wait for the DB.
+ */
+function getCachedProfile() {
+  try {
+    const raw = sessionStorage.getItem(PROFILE_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function cacheProfile(profile) {
+  try {
+    if (profile) sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
+    else sessionStorage.removeItem(PROFILE_CACHE_KEY);
+  } catch { /* ignore */ }
+}
+
+/** Cache binders so Dashboard can show them instantly on refresh. */
+export function getCachedBinders() {
+  try {
+    const raw = sessionStorage.getItem(BINDERS_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+export function cacheBinders(binders) {
+  try {
+    if (binders) sessionStorage.setItem(BINDERS_CACHE_KEY, JSON.stringify(binders));
+    else sessionStorage.removeItem(BINDERS_CACHE_KEY);
+  } catch { /* ignore */ }
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState(() => getCachedProfile());
   const [loading, setLoading] = useState(true);
-  const profileRetryRef = useRef(null);
+
+  // Refs to avoid stale closures in callbacks
+  const profileRef = useRef(profile);
+  const userRef = useRef(user);
   const mountedRef = useRef(true);
+  const explicitSignOutRef = useRef(false);
+
+  // Keep refs in sync with state
+  useEffect(() => { profileRef.current = profile; }, [profile]);
+  useEffect(() => { userRef.current = user; }, [user]);
 
   /**
-   * Fetch or create the profile row for a given user.
-   * Retries on transient failures to avoid leaving profile as null.
-   * NEVER nulls out an existing profile on error — only updates on success.
+   * Fetch or create the profile for a user.
+   * On failure: never clears an existing profile — stale data > no data.
    */
-  const ensureProfile = useCallback(async (currentUser, retries = PROFILE_MAX_RETRIES) => {
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      try {
-        const { data: existing, error } = await getProfile(currentUser.id);
-        if (error && error.code !== 'PGRST116') {
-          // PGRST116 = "no rows returned" (expected for new users)
-          throw error;
-        }
-        if (existing) {
-          if (mountedRef.current) setProfile(existing);
-          return;
-        }
-        // No profile yet — create one
-        const displayName =
-          currentUser.user_metadata?.full_name ||
-          currentUser.user_metadata?.name ||
-          currentUser.email?.split('@')[0] ||
-          'Trainer';
-        const { data: created, error: createErr } = await createProfile(currentUser.id, displayName);
-        if (createErr) throw createErr;
-        if (mountedRef.current) setProfile(created);
+  const ensureProfile = useCallback(async (currentUser) => {
+    try {
+      const { data: existing, error } = await getProfile(currentUser.id);
+      if (error && error.code !== 'PGRST116') {
+        // Real error (not "no rows") — keep existing profile if we have one
+        console.error('getProfile error:', error);
         return;
-      } catch (err) {
-        console.error(`ensureProfile attempt ${attempt + 1}/${retries + 1}:`, err);
-        if (attempt < retries) {
-          await new Promise(r => setTimeout(r, PROFILE_RETRY_DELAY * (attempt + 1)));
-        }
       }
+      if (existing) {
+        if (mountedRef.current) {
+          setProfile(existing);
+          cacheProfile(existing);
+        }
+        return;
+      }
+      // New user — create profile
+      const displayName =
+        currentUser.user_metadata?.full_name ||
+        currentUser.user_metadata?.name ||
+        currentUser.email?.split('@')[0] ||
+        'Trainer';
+      const { data: created, error: createErr } = await createProfile(currentUser.id, displayName);
+      if (createErr) {
+        console.error('createProfile error:', createErr);
+        return;
+      }
+      if (mountedRef.current) {
+        setProfile(created);
+        cacheProfile(created);
+      }
+    } catch (err) {
+      console.error('ensureProfile exception:', err);
+      // Keep whatever profile we have — don't blank the UI
     }
-    // All retries exhausted — do NOT null out an existing profile
-    console.warn('ensureProfile: all retries failed, keeping existing profile state');
   }, []);
 
   useEffect(() => {
     mountedRef.current = true;
     let cancelled = false;
 
-    // Fallback: if Supabase never responds, unblock UI after 8s
+    // Fallback: if Supabase never responds, unblock UI after 6s
     const fallback = setTimeout(() => {
       if (!cancelled && mountedRef.current) setLoading(false);
-    }, 8000);
+    }, 6000);
 
-    // Bootstrap: read session from localStorage (no network call if token is fresh)
+    // Bootstrap: read session from localStorage (fast path, no network if token is fresh)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (cancelled) return;
       clearTimeout(fallback);
@@ -75,28 +118,76 @@ export function AuthProvider({ children }) {
       setUser(currentUser);
       // Unblock UI immediately — ProtectedRoute only needs `user`, not `profile`
       setLoading(false);
+
       if (currentUser) {
+        // We may already have a cached profile from sessionStorage (set in useState init).
+        // Still fetch fresh data from DB in the background.
         await ensureProfile(currentUser);
       } else {
         setProfile(null);
+        cacheProfile(null);
       }
     }).catch(() => {
       if (!cancelled) setLoading(false);
     });
 
-    // Subscribe to subsequent auth changes (sign-in, sign-out, token refresh)
+    // Listen for subsequent auth events
     const { data: { subscription } } = onAuthStateChange(async (event, session) => {
       if (event === 'INITIAL_SESSION' || cancelled) return;
 
       const currentUser = session?.user ?? null;
-      setUser(currentUser);
 
+      if (event === 'TOKEN_REFRESHED') {
+        // Token refreshed — update user object but DON'T re-fetch profile.
+        // We already have it. This prevents unnecessary DB calls and state churn.
+        if (currentUser) {
+          setUser(currentUser);
+        }
+        return;
+      }
+
+      if (event === 'SIGNED_OUT') {
+        // Only clear state if the user explicitly signed out.
+        // Supabase can fire SIGNED_OUT on token refresh failure — we don't
+        // want to boot the user just because of a transient network issue.
+        if (explicitSignOutRef.current) {
+          setUser(null);
+          setProfile(null);
+          cacheProfile(null);
+          cacheBinders(null);
+          explicitSignOutRef.current = false;
+        } else {
+          // Transient — try to recover the session silently
+          console.warn('Unexpected SIGNED_OUT event — attempting session recovery');
+          try {
+            const { data: { session: recovered } } = await supabase.auth.getSession();
+            if (recovered?.user) {
+              setUser(recovered.user);
+              // Profile is still in state from before, so no action needed
+            }
+            // If no session recovered, the user's refresh token truly expired.
+            // In that case we do need to clear state.
+            else {
+              setUser(null);
+              setProfile(null);
+              cacheProfile(null);
+              cacheBinders(null);
+            }
+          } catch {
+            // Network completely down — keep current state, don't boot user
+            console.warn('Session recovery failed — keeping current state');
+          }
+        }
+        return;
+      }
+
+      // SIGNED_IN or other events
+      setUser(currentUser);
       if (currentUser) {
-        // On TOKEN_REFRESHED, don't re-fetch profile unless we don't have one
-        if (event === 'TOKEN_REFRESHED' && profile) return;
         await ensureProfile(currentUser);
       } else {
         setProfile(null);
+        cacheProfile(null);
       }
     });
 
@@ -104,19 +195,14 @@ export function AuthProvider({ children }) {
       cancelled = true;
       mountedRef.current = false;
       clearTimeout(fallback);
-      clearTimeout(profileRetryRef.current);
       subscription.unsubscribe();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /**
-   * Force-refresh the profile from the database.
-   * Components can call this after updating the profile row.
-   */
   const refreshProfile = useCallback(async () => {
-    if (!user) return;
-    await ensureProfile(user, 1);
-  }, [user, ensureProfile]);
+    if (!userRef.current) return;
+    await ensureProfile(userRef.current);
+  }, [ensureProfile]);
 
   async function signUp(email, password) {
     return authSignUp(email, password);
@@ -127,12 +213,25 @@ export function AuthProvider({ children }) {
   }
 
   async function signOut() {
-    const { error } = await authSignOut();
-    if (!error) {
-      setUser(null);
-      setProfile(null);
+    // Mark explicit sign-out BEFORE calling Supabase.
+    // This tells the onAuthStateChange handler to actually clear state.
+    explicitSignOutRef.current = true;
+    try {
+      const { error } = await authSignOut();
+      if (error) {
+        console.error('signOut error:', error);
+        // Even if Supabase call fails, STILL clear local state.
+        // User clicked "sign out" — honour their intent.
+      }
+    } catch (err) {
+      console.error('signOut exception:', err);
     }
-    return { error };
+    // Always clear local state regardless of Supabase response
+    setUser(null);
+    setProfile(null);
+    cacheProfile(null);
+    cacheBinders(null);
+    return { error: null };
   }
 
   return (
