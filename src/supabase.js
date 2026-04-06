@@ -19,7 +19,8 @@ export const supabase = createClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      storageKey: 'pokebinder-auth',
+      // DO NOT set a custom storageKey — it breaks existing sessions.
+      // Supabase default: sb-<project-ref>-auth-token
     },
   }
 );
