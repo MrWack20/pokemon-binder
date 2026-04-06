@@ -1,33 +1,16 @@
 import { supabase, ensureValidSession } from '../supabase.js';
 
 /**
- * Fetch all binders for a profile, including a card count from binder_cards.
- * Each returned binder has: binder_cards: [{ count: "N" }]
- *
- * If the first attempt returns empty (possible expired JWT + RLS),
- * forces a session refresh and retries once.
+ * Fetch all binders for a profile, including a card count.
+ * Calls ensureValidSession() first to guarantee the JWT is fresh.
  */
 export async function getBinders(profileId) {
+  await ensureValidSession();
   const { data, error } = await supabase
     .from('binders')
     .select('*, binder_cards(count)')
     .eq('profile_id', profileId)
     .order('created_at', { ascending: true });
-
-  // RLS silently returns [] when JWT is expired — detect and retry
-  if (!error && data && data.length === 0) {
-    const session = await ensureValidSession();
-    if (session) {
-      // Retry with (hopefully) refreshed token
-      const retry = await supabase
-        .from('binders')
-        .select('*, binder_cards(count)')
-        .eq('profile_id', profileId)
-        .order('created_at', { ascending: true });
-      return { data: retry.data, error: retry.error };
-    }
-  }
-
   return { data, error };
 }
 

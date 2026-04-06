@@ -165,19 +165,15 @@ function Dashboard() {
     setSyncing(true);
     try {
       const { data, error } = await getBinders(profile.id);
-      if (error) {
-        console.error('Error loading binders:', error);
-        setSyncing(false);
-        return { error };
-      }
+      if (error) { console.error('Error loading binders:', error); return { error }; }
       setBinders(data || []);
       cacheBinders(data || []);
-      setSyncing(false);
       return { error: null };
     } catch (err) {
       console.error('loadBinders exception:', err);
-      setSyncing(false);
       return { error: err };
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -220,71 +216,85 @@ function Dashboard() {
   // ── Binder CRUD ───────────────────────────────────────────────────────────
   const handleCreateBinder = async (binderData) => {
     setSyncing(true);
-    const { data, error } = await createBinderSvc(profile.id, {
-      name: binderData.name,
-      rows: binderData.rows,
-      cols: binderData.cols,
-      pages: binderData.pages,
-      cover_color: binderData.coverColor,
-      cover_text: binderData.coverText || null,
-    });
-    if (error || !data) {
-      toast.error('Failed to create binder.');
-      setSyncing(false);
-      return;
-    }
-    // Upload cover image if one was provided
-    if (binderData.coverImageFile) {
-      const url = await uploadBinderCover(data.id, binderData.coverImageFile);
-      if (url) {
-        await updateBinderSvc(data.id, { cover_image_url: url });
-        data.cover_image_url = url;
+    try {
+      const { data, error } = await createBinderSvc(profile.id, {
+        name: binderData.name,
+        rows: binderData.rows,
+        cols: binderData.cols,
+        pages: binderData.pages,
+        cover_color: binderData.coverColor,
+        cover_text: binderData.coverText || null,
+      });
+      if (error || !data) { toast.error('Failed to create binder.'); return; }
+      if (binderData.coverImageFile) {
+        const url = await uploadBinderCover(data.id, binderData.coverImageFile);
+        if (url) { await updateBinderSvc(data.id, { cover_image_url: url }); data.cover_image_url = url; }
       }
+      setBinders(prev => {
+        const next = [...prev, { ...data, cards: Array(data.rows * data.cols * data.pages).fill(null) }];
+        cacheBinders(next);
+        return next;
+      });
+      toast.success(`Binder "${data.name}" created!`);
+    } catch (err) {
+      console.error('handleCreateBinder:', err);
+      toast.error('Failed to create binder.');
+    } finally {
+      setSyncing(false);
     }
-    setBinders(prev => {
-      const next = [...prev, { ...data, cards: Array(data.rows * data.cols * data.pages).fill(null) }];
-      cacheBinders(next);
-      return next;
-    });
-    toast.success(`Binder "${data.name}" created!`);
-    setSyncing(false);
   };
 
   const handleUpdateBinder = async (binderId, updates) => {
     setSyncing(true);
-    const { data, error } = await updateBinderSvc(binderId, updates);
-    if (error) { toast.error('Failed to update binder.'); setSyncing(false); return; }
-    setBinders(prev => prev.map(b => b.id === binderId ? { ...b, ...data } : b));
-    if (selectedBinder?.id === binderId) {
-      setSelectedBinder(prev => ({ ...prev, ...data }));
+    try {
+      const { data, error } = await updateBinderSvc(binderId, updates);
+      if (error) { toast.error('Failed to update binder.'); return; }
+      setBinders(prev => prev.map(b => b.id === binderId ? { ...b, ...data } : b));
+      if (selectedBinder?.id === binderId) setSelectedBinder(prev => ({ ...prev, ...data }));
+    } catch (err) {
+      console.error('handleUpdateBinder:', err);
+      toast.error('Failed to update binder.');
+    } finally {
+      setSyncing(false);
     }
-    setSyncing(false);
   };
 
   const handleDeleteBinder = async (binderId) => {
     setSyncing(true);
-    const { error } = await deleteBinderSvc(binderId);
-    if (error) { toast.error('Failed to delete binder.'); setSyncing(false); return; }
-    setBinders(prev => {
-      const next = prev.filter(b => b.id !== binderId);
-      cacheBinders(next);
-      return next;
-    });
-    toast.success('Binder deleted.');
-    setSyncing(false);
+    try {
+      const { error } = await deleteBinderSvc(binderId);
+      if (error) { toast.error('Failed to delete binder.'); return; }
+      setBinders(prev => {
+        const next = prev.filter(b => b.id !== binderId);
+        cacheBinders(next);
+        return next;
+      });
+      toast.success('Binder deleted.');
+    } catch (err) {
+      console.error('handleDeleteBinder:', err);
+      toast.error('Failed to delete binder.');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleDuplicateBinder = async (binderId, binderName) => {
     setSyncing(true);
-    const { data, error } = await duplicateBinderSvc(binderId);
-    if (error || !data) { toast.error('Failed to duplicate binder.'); setSyncing(false); return; }
-    setBinders(prev => {
-      const next = [...prev, { ...data, binder_cards: [{ count: 0 }] }];
-      cacheBinders(next);
-      return next;
-    });
-    toast.success(`"${binderName}" duplicated.`);
-    setSyncing(false);
+    try {
+      const { data, error } = await duplicateBinderSvc(binderId);
+      if (error || !data) { toast.error('Failed to duplicate binder.'); return; }
+      setBinders(prev => {
+        const next = [...prev, { ...data, binder_cards: [{ count: 0 }] }];
+        cacheBinders(next);
+        return next;
+      });
+      toast.success(`"${binderName}" duplicated.`);
+    } catch (err) {
+      console.error('handleDuplicateBinder:', err);
+      toast.error('Failed to duplicate binder.');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   // ── Open binder: fetch cards and reconstruct slot array ───────────────────
@@ -292,20 +302,17 @@ function Dashboard() {
     setSyncing(true);
     try {
       const { data: cardRows, error } = await getBinderCards(binder.id);
-      if (error) {
-        toast.error('Failed to load binder. Check your connection and try again.');
-        setSyncing(false);
-        return;
-      }
+      if (error) { toast.error('Failed to load binder.'); return; }
       const cards = buildCardsArray(binder.rows, binder.cols, binder.pages, cardRows);
       setSelectedBinder({ ...binder, cards });
       setCurrentPage(0);
       setView('binderView');
     } catch (err) {
-      console.error('handleSelectBinder exception:', err);
+      console.error('handleSelectBinder:', err);
       toast.error('Failed to load binder.');
+    } finally {
+      setSyncing(false);
     }
-    setSyncing(false);
   };
 
   // ── Card CRUD ─────────────────────────────────────────────────────────────
