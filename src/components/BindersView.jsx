@@ -89,6 +89,7 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
             onChange={(e) => setBinderForm({ ...binderForm, name: e.target.value })}
             placeholder="Binder Name"
             className="input"
+            maxLength={60}
           />
           <div className="form-row">
             <div className="form-group">
@@ -156,7 +157,8 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
           <input type="text" value={binderForm.coverText}
             onChange={(e) => setBinderForm({ ...binderForm, coverText: e.target.value })}
             placeholder="Cover Text (optional)"
-            className="input" />
+            className="input"
+            maxLength={40} />
           <div className="button-group">
             <button onClick={handleCreate} className="btn btn-success">Create</button>
             <button onClick={() => setShowCreate(false)} className="btn btn-secondary">Cancel</button>

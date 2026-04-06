@@ -20,19 +20,22 @@ export function AuthProvider({ children }) {
 
     // Bootstrap: read session from localStorage immediately (no network call if token is fresh).
     // This is the fast path on page refresh — avoids waiting for onAuthStateChange to fire.
-    const fallback = setTimeout(() => { if (!cancelled) setLoading(false); }, 5000);
+    // Fallback increased to 10s — slow networks shouldn't redirect logged-in users to /login
+    const fallback = setTimeout(() => { if (!cancelled) setLoading(false); }, 10000);
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (cancelled) return;
       clearTimeout(fallback);
       const currentUser = session?.user ?? null;
       setUser(currentUser);
+      // Unblock the UI immediately — ProtectedRoute only needs `user`, not `profile`.
+      // ensureProfile() runs in the background; profile state updates when it resolves.
+      if (!cancelled) setLoading(false);
       if (currentUser) {
         try { await ensureProfile(currentUser); } catch (err) { console.error('ensureProfile:', err); }
       } else {
         setProfile(null);
       }
-      if (!cancelled) setLoading(false);
     }).catch(() => {
       if (!cancelled) setLoading(false);
     });
