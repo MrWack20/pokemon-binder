@@ -1,20 +1,78 @@
-<<<<<<< HEAD
-# React + Vite
+# PokeBinder
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A web app for organizing and showcasing your Pokémon TCG collection digitally — so you never have to lug your physical binder around again.
 
-Currently, two official plugins are available:
+Built by MrWack.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+**Live app:** deployed on Vercel
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Features
 
-## Expanding the ESLint configuration
+- **Auth** — email/password sign-up & login, Google OAuth, password reset via email
+- **Custom binders** — configure rows, columns, and pages per binder; custom cover color, text, and image
+- **Card search** — search the full Pokémon TCG catalog via the Pokémon TCG API with set, type, rarity, and supertype filters
+- **Drag & drop** — rearrange cards within a binder (pointer + touch support)
+- **Card prices** — displays cardmarket average sell price (EUR) on each card
+- **Background themes** — customizable app background via Settings
+- **Cloud sync** — all data synced to Supabase Postgres (per-user, RLS enforced)
+- **Cover images** — upload a cover photo stored in Supabase Storage
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-=======
-# pokemon-binder
->>>>>>> 2991c3a502c446c217d61e1ea12880793a921cc6
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | React 19 + Vite 7 |
+| Auth & Database | Supabase (Postgres + Auth + Storage) |
+| Drag & Drop | @dnd-kit/core |
+| Toasts | react-hot-toast |
+| Card data | Pokémon TCG API |
+| Icons | Lucide React |
+| Routing | React Router DOM v7 |
+| Deployment | Vercel |
+
+---
+
+## Setup
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/MrWack20/pokemon-binder.git
+cd pokemon-binder
+
+# 2. Install dependencies
+npm install
+
+# 3. Create a .env file
+cp .env.example .env
+# Fill in your Supabase URL, anon key, and Pokemon TCG API key
+```
+
+### Environment variables
+
+```
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_POKEMON_TCG_API_KEY=your_pokemon_tcg_api_key
+```
+
+### Supabase setup
+
+1. Apply the schema: run `supabase/migrations/001_initial_schema.sql` in the Supabase SQL Editor
+2. Create a public storage bucket named `binder-covers` (Storage → New bucket)
+3. Enable Google OAuth in Supabase Auth settings (if using Google sign-in)
+
+### Dev server
+
+```bash
+npm run dev
+```
+
+---
+
+## Project Status
+
+Core features complete. See [ROADMAP.md](./ROADMAP.md) for upcoming phases.

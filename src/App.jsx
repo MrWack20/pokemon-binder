@@ -1,70 +1,135 @@
 import React, { useState, useEffect } from 'react';
-import { Book, Plus, Search, X, Trash2, Edit2, Eye, Save, ChevronLeft, ChevronRight, Filter, RefreshCw, Settings, Upload, GripVertical } from 'lucide-react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Book, RefreshCw, Layers, BarChart2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import './App.css';
-import { db } from './firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot } from 'firebase/firestore';
-import { BACKGROUND_THEMES, API_KEY } from './constants/themes';
-import SettingsPanel from './components/SettingsPanel';
-import ProfilesView from './components/ProfilesView';
+import { supabase } from './supabase.js';
+import { BACKGROUND_THEMES } from './constants/themes';
+import SettingsPage from './components/SettingsPage';
+import StatsPage from './components/StatsPage';
+import SetsPage from './components/SetsPage';
+import CardDetailModal from './components/CardDetailModal';
+import CardInspectModal from './components/CardInspectModal';
 import BindersView from './components/BindersView';
 import EditBinderCover from './components/EditBinderCover';
 import BinderView from './components/BinderView';
+import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
+import ProtectedRoute from './components/Auth/ProtectedRoute.jsx';
+import LoginPage from './components/Auth/LoginPage.jsx';
+import RegisterPage from './components/Auth/RegisterPage.jsx';
+import ForgotPasswordPage from './components/Auth/ForgotPasswordPage.jsx';
+import AuthCallbackPage from './components/Auth/AuthCallbackPage.jsx';
+import ResetPasswordPage from './components/Auth/ResetPasswordPage.jsx';
+import UserMenu from './components/Auth/UserMenu.jsx';
+import {
+  getBinders,
+  createBinder as createBinderSvc,
+  updateBinder as updateBinderSvc,
+  deleteBinder as deleteBinderSvc,
+  duplicateBinder as duplicateBinderSvc,
+} from './services/binderService.js';
+import {
+  getBinderCards,
+  addCard,
+  removeCard,
+  moveCard,
+  swapCards as swapCardsSvc,
+} from './services/cardService.js';
+import { searchCards as searchCardsSvc, getSets, addRecentSearch } from './services/searchService.js';
+import { searchMtgCards, mtgCardToDbRow } from './services/mtgService.js';
+import { searchYgoCards, ygoCardToDbRow } from './services/yugiohService.js';
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-export default function PokemonBinderApp() {
-  const [profiles, setProfiles] = useState([]);
-  const [currentProfile, setCurrentProfile] = useState(null);
-  const [view, setView] = useState('profiles');
+/**
+ * Upload a cover image File to Supabase Storage bucket "binder-covers".
+ * Requires the bucket to exist in your Supabase project (Storage → New bucket).
+ * Returns the public URL, or null on failure.
+ */
+async function uploadBinderCover(binderId, file) {
+  const ext = file.name.split('.').pop();
+  const path = `${binderId}/${Date.now()}.${ext}`;
+  const { error } = await supabase.storage
+    .from('binder-covers')
+    .upload(path, file, { upsert: true });
+  if (error) {
+    console.error('Cover upload failed:', error.message);
+    return null;
+  }
+  const { data: { publicUrl } } = supabase.storage
+    .from('binder-covers')
+    .getPublicUrl(path);
+  return publicUrl;
+}
+
+/**
+ * Reconstruct a slot-indexed cards array from binder_cards DB rows.
+ * Slots without a card remain null.
+ */
+function buildCardsArray(rows, cols, pages, cardRows) {
+  const totalSlots = rows * cols * pages;
+  const arr = Array(totalSlots).fill(null);
+  (cardRows || []).forEach(card => {
+    if (card.slot_index >= 0 && card.slot_index < totalSlots) {
+      arr[card.slot_index] = card;
+    }
+  });
+  return arr;
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+function Dashboard() {
+  const { profile } = useAuth();
+  const navigate = useNavigate();
+
+  // ── View state ──────────────────────────────────────────────────────────────
+  const [view, setView] = useState('binders');
+  const [binders, setBinders] = useState([]);
   const [selectedBinder, setSelectedBinder] = useState(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+
+  // ── Search state ─────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedCell, setSelectedCell] = useState(null);
   const [searchFilters, setSearchFilters] = useState({
-    set: '',
-    type: '',
-    rarity: '',
-    supertype: '',
-    language: ''
+    set: '', type: '', rarity: '', supertype: '', language: '',
   });
   const [sets, setSets] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
-  const [searchCache, setSearchCache] = useState({});
-  const [syncing, setSyncing] = useState(false);
   const [searchPage, setSearchPage] = useState(1);
   const [totalSearchPages, setTotalSearchPages] = useState(0);
-  const [showSettings, setShowSettings] = useState(false);
-  const [appSettings, setAppSettings] = useState({
-    backgroundTheme: 'default'
-  });
-  const [draggedCard, setDraggedCard] = useState(null);
+  const [searchSort, setSearchSort] = useState('');
+  const [searchGame, setSearchGame] = useState('pokemon');
+  const [modalCard, setModalCard] = useState(null);
+  const [inspectCard, setInspectCard] = useState(null);
 
-  // Load profiles from Firebase on mount
+  // ── Settings state ───────────────────────────────────────────────────────
+  const [appSettings, setAppSettings] = useState({ backgroundTheme: 'default' });
+
+  // ── Bootstrap ────────────────────────────────────────────────────────────
   useEffect(() => {
-    loadProfilesFromFirebase();
-    loadSets();
+    loadSetsData();
     loadAppSettings();
   }, []);
 
-  // Apply background theme
+  useEffect(() => {
+    if (profile?.id) loadBinders();
+  }, [profile]);
+
   useEffect(() => {
     const theme = BACKGROUND_THEMES[appSettings.backgroundTheme] || BACKGROUND_THEMES.default;
-    const colors = theme.colors;
-    
-    if (colors.length === 2) {
-      document.body.style.background = `linear-gradient(135deg, ${colors[0]} 0%, ${colors[1]} 100%)`;
-    } else if (colors.length === 3) {
-      document.body.style.background = `linear-gradient(135deg, ${colors[0]} 0%, ${colors[1]} 50%, ${colors[2]} 100%)`;
-    }
+    document.body.style.background = theme.css;
     document.body.style.minHeight = '100vh';
   }, [appSettings.backgroundTheme]);
 
+  // ── Settings helpers ──────────────────────────────────────────────────────
   const loadAppSettings = () => {
     const saved = localStorage.getItem('pokemonBinderSettings');
-    if (saved) {
-      setAppSettings(JSON.parse(saved));
-    }
+    if (saved) setAppSettings(JSON.parse(saved));
   };
 
   const saveAppSettings = (newSettings) => {
@@ -72,324 +137,268 @@ export default function PokemonBinderApp() {
     localStorage.setItem('pokemonBinderSettings', JSON.stringify(newSettings));
   };
 
-  // Real-time listener for profiles
-  const loadProfilesFromFirebase = () => {
+  // ── Data loaders ──────────────────────────────────────────────────────────
+  const loadBinders = async () => {
     setSyncing(true);
-    const unsubscribe = onSnapshot(collection(db, 'profiles'), (snapshot) => {
-      const profilesData = [];
-      snapshot.forEach((doc) => {
-        profilesData.push({ ...doc.data(), id: doc.id });
-      });
-      setProfiles(profilesData);
-      setSyncing(false);
-    }, (error) => {
-      console.error('Error loading profiles:', error);
-      setSyncing(false);
-      // Fallback to localStorage if Firebase fails
-      const savedProfiles = JSON.parse(localStorage.getItem('pokemonProfiles') || '[]');
-      setProfiles(savedProfiles);
-    });
-
-    return unsubscribe;
+    const { data, error } = await getBinders(profile.id);
+    if (error) console.error('Error loading binders:', error);
+    else setBinders(data || []);
+    setSyncing(false);
   };
 
-  const loadSets = async () => {
-    try {
-      const headers = API_KEY ? { 'X-Api-Key': API_KEY } : {};
-      const response = await fetch('https://api.pokemontcg.io/v2/sets?pageSize=250', { headers });
-      const data = await response.json();
-      setSets(data.data || []);
-    } catch (error) {
-      console.error('Error loading sets:', error);
+  const loadSetsData = async () => {
+    const { data } = await getSets();
+    if (data) setSets(data);
+  };
+
+  // ── Search ────────────────────────────────────────────────────────────────
+  const handleSearch = async (query, filters = searchFilters, page = 1, sort = searchSort, game = searchGame) => {
+    setLoading(true);
+    setSearchResults([]);
+    if (query?.trim()) addRecentSearch(query);
+
+    let result;
+    if (game === 'mtg') {
+      result = await searchMtgCards(query, page);
+    } else if (game === 'yugioh') {
+      result = await searchYgoCards(query, page);
+    } else {
+      result = await searchCardsSvc(query, filters, page, sort);
     }
+
+    const { data, error } = result;
+    if (error || !data) {
+      setSearchResults([]);
+      setTotalSearchPages(0);
+      setLoading(false);
+      toast.error('Search failed. Try different terms or filters.');
+      return;
+    }
+    setSearchResults(data.results);
+    setTotalSearchPages(data.totalPages);
+    setSearchPage(page);
+    setLoading(false);
   };
 
-  const searchCards = async (query, filters = searchFilters, page = 1) => {
-    if (!query.trim() && !filters.set && !filters.type && !filters.rarity && !filters.supertype && !filters.language) return;
-    
-    const cacheKey = JSON.stringify({ query, filters, page });
-    
-    // Check cache first for instant results
-    if (searchCache[cacheKey]) {
-      setSearchResults(searchCache[cacheKey].results);
-      setTotalSearchPages(searchCache[cacheKey].totalPages);
-      setSearchPage(page);
-      setLoading(false);
+  // ── Binder CRUD ───────────────────────────────────────────────────────────
+  const handleCreateBinder = async (binderData) => {
+    setSyncing(true);
+    const { data, error } = await createBinderSvc(profile.id, {
+      name: binderData.name,
+      rows: binderData.rows,
+      cols: binderData.cols,
+      pages: binderData.pages,
+      cover_color: binderData.coverColor,
+      cover_text: binderData.coverText || null,
+    });
+    if (error || !data) {
+      toast.error('Failed to create binder.');
+      setSyncing(false);
+      return;
+    }
+    // Upload cover image if one was provided
+    if (binderData.coverImageFile) {
+      const url = await uploadBinderCover(data.id, binderData.coverImageFile);
+      if (url) {
+        await updateBinderSvc(data.id, { cover_image_url: url });
+        data.cover_image_url = url;
+      }
+    }
+    setBinders(prev => [
+      ...prev,
+      { ...data, cards: Array(data.rows * data.cols * data.pages).fill(null) },
+    ]);
+    toast.success(`Binder "${data.name}" created!`);
+    setSyncing(false);
+  };
+
+  const handleUpdateBinder = async (binderId, updates) => {
+    setSyncing(true);
+    const { data, error } = await updateBinderSvc(binderId, updates);
+    if (error) { toast.error('Failed to update binder.'); setSyncing(false); return; }
+    setBinders(prev => prev.map(b => b.id === binderId ? { ...b, ...data } : b));
+    if (selectedBinder?.id === binderId) {
+      setSelectedBinder(prev => ({ ...prev, ...data }));
+    }
+    setSyncing(false);
+  };
+
+  const handleDeleteBinder = async (binderId) => {
+    setSyncing(true);
+    const { error } = await deleteBinderSvc(binderId);
+    if (error) { toast.error('Failed to delete binder.'); setSyncing(false); return; }
+    setBinders(prev => prev.filter(b => b.id !== binderId));
+    toast.success('Binder deleted.');
+    setSyncing(false);
+  };
+
+  const handleDuplicateBinder = async (binderId, binderName) => {
+    setSyncing(true);
+    const { data, error } = await duplicateBinderSvc(binderId);
+    if (error || !data) { toast.error('Failed to duplicate binder.'); setSyncing(false); return; }
+    setBinders(prev => [...prev, { ...data, binder_cards: [{ count: 0 }] }]);
+    toast.success(`"${binderName}" duplicated.`);
+    setSyncing(false);
+  };
+
+  // ── Open binder: fetch cards and reconstruct slot array ───────────────────
+  const handleSelectBinder = async (binder) => {
+    setSyncing(true);
+    const { data: cardRows, error } = await getBinderCards(binder.id);
+    if (error) { toast.error('Failed to load binder.'); setSyncing(false); return; }
+    const cards = buildCardsArray(binder.rows, binder.cols, binder.pages, cardRows);
+    setSelectedBinder({ ...binder, cards });
+    setCurrentPage(0);
+    setView('binderView');
+    setSyncing(false);
+  };
+
+  // ── Card CRUD ─────────────────────────────────────────────────────────────
+
+  /**
+   * Add a TCG API card object to the selected slot.
+   * Maps API fields → binder_cards DB columns.
+   */
+  const handleAddCard = async (apiCard) => {
+    if (selectedCell === null || !selectedBinder) {
+      console.warn('handleAddCard: selectedCell=', selectedCell, 'selectedBinder=', selectedBinder);
+      return;
+    }
+    const game = apiCard._game ?? 'pokemon';
+    let dbRow;
+    if (game === 'mtg') {
+      dbRow = mtgCardToDbRow(apiCard);
+    } else if (game === 'yugioh') {
+      dbRow = ygoCardToDbRow(apiCard);
+    } else {
+      dbRow = {
+        card_api_id: apiCard.id,
+        card_name: apiCard.name,
+        card_image_url: apiCard.images?.small ?? apiCard.images?.large ?? '',
+        card_set: apiCard.set?.name ?? null,
+        card_game: 'pokemon',
+        card_price: apiCard._price
+          ?? apiCard.tcgplayer?.prices?.holofoil?.market
+          ?? apiCard.tcgplayer?.prices?.normal?.market
+          ?? apiCard.tcgplayer?.prices?.['1stEditionHolofoil']?.market
+          ?? apiCard.tcgplayer?.prices?.unlimited?.market
+          ?? null,
+        card_price_currency: 'USD',
+      };
+    }
+    const { data, error } = await addCard(selectedBinder.id, selectedCell, dbRow);
+    if (error || !data) {
+      console.error('addCard error:', error);
+      toast.error(`Failed to add card: ${error?.message ?? 'unknown error'}`);
       return;
     }
 
-    setLoading(true);
-    setSearchResults([]); // Clear old results immediately
-    
-    try {
-      let queryParams = [];
-      
-      if (query.trim()) {
-        queryParams.push(`name:${query}*`);
-      }
-      
-      if (filters.set) {
-        queryParams.push(`set.id:${filters.set}`);
-      }
-      
-      if (filters.type) {
-        queryParams.push(`types:${filters.type}`);
-      }
-      
-      if (filters.rarity) {
-        queryParams.push(`rarity:"${filters.rarity}"`);
-      }
-      
-      if (filters.supertype) {
-        queryParams.push(`supertype:${filters.supertype}`);
-      }
-
-      if (filters.language) {
-        queryParams.push(`nationalPokedexNumbers:[1 TO 1025]`);
-      }
-
-      const queryString = queryParams.join(' ');
-      const headers = API_KEY ? { 'X-Api-Key': API_KEY } : {};
-      
-      const pageSize = 10; // Reduced for faster response
-      
-      const response = await fetch(
-        `https://api.pokemontcg.io/v2/cards?q=${queryString}&page=${page}&pageSize=${pageSize}&orderBy=-set.releaseDate`,
-        { headers }
-      );
-      
-      if (!response.ok) {
-        throw new Error('Search failed');
-      }
-      
-      const data = await response.json();
-      let results = data.data || [];
-      
-      if (filters.language) {
-        results = results.filter(card => {
-          return true;
-        });
-      }
-
-      const totalCount = data.totalCount || results.length;
-      const totalPages = Math.ceil(totalCount / pageSize);
-      
-      // Cache the results
-      setSearchCache(prev => ({ ...prev, [cacheKey]: { results, totalPages } }));
-      
-      // Set results
-      setSearchResults(results);
-      setTotalSearchPages(totalPages);
-      setSearchPage(page);
-      setLoading(false);
-      
-    } catch (error) {
-      console.error('Error fetching cards:', error);
-      setSearchResults([]);
-      setTotalSearchPages(0);
-      setLoading(false);
-      alert('Search failed. Please try again with different filters.');
-    }
+    const updatedCards = [...selectedBinder.cards];
+    updatedCards[selectedCell] = data;
+    setSelectedBinder({ ...selectedBinder, cards: updatedCards });
+    setSelectedCell(null);
+    setSearchResults([]);
+    setSearchQuery('');
+    setSearchFilters({ set: '', type: '', rarity: '', supertype: '', language: '' });
+    setSearchPage(1);
+    setTotalSearchPages(0);
+    toast.success(`${data.card_name} added!`);
   };
 
-  const createProfile = async (name) => {
-    setSyncing(true);
-    try {
-      const newProfile = {
-        name,
-        binders: [],
-        createdAt: new Date().toISOString()
-      };
-      
-      const docRef = await addDoc(collection(db, 'profiles'), newProfile);
-      console.log('Profile created with ID:', docRef.id);
-      setSyncing(false);
-      return { ...newProfile, id: docRef.id };
-    } catch (error) {
-      console.error('Error creating profile:', error);
-      setSyncing(false);
-      alert('Failed to create profile. Please check your Firebase connection.');
-    }
+  /** Remove a card by its slot index. Uses the DB row id stored in the slot. */
+  const handleRemoveCard = async (slotIndex) => {
+    if (!selectedBinder) return;
+    const card = selectedBinder.cards[slotIndex];
+    if (!card) return;
+    const { error } = await removeCard(card.id);
+    if (error) { toast.error('Failed to remove card.'); return; }
+    const updatedCards = [...selectedBinder.cards];
+    updatedCards[slotIndex] = null;
+    setSelectedBinder({ ...selectedBinder, cards: updatedCards });
   };
 
-  const deleteProfile = async (profileId) => {
-    setSyncing(true);
-    try {
-      await deleteDoc(doc(db, 'profiles', profileId));
-      if (currentProfile?.id === profileId) {
-        setCurrentProfile(null);
-        setView('profiles');
-      }
-      setSyncing(false);
-    } catch (error) {
-      console.error('Error deleting profile:', error);
-      setSyncing(false);
-      alert('Failed to delete profile.');
-    }
+  /**
+   * Swap or move cards using slot indices (as BinderView expects).
+   * Looks up the DB row id from the local slot array before calling the service.
+   */
+  const handleSwapCards = async (fromIndex, toIndex) => {
+    if (!selectedBinder || fromIndex === toIndex) return;
+    const fromCard = selectedBinder.cards[fromIndex];
+    const toCard = selectedBinder.cards[toIndex];
+    if (!fromCard) return;
+
+    const { error } = fromCard && toCard
+      ? await swapCardsSvc(fromCard.id, toCard.id)
+      : await moveCard(fromCard.id, toIndex);
+
+    if (error) { toast.error('Failed to move card.'); return; }
+
+    const updatedCards = [...selectedBinder.cards];
+    updatedCards[fromIndex] = toCard ? { ...toCard, slot_index: fromIndex } : null;
+    updatedCards[toIndex] = { ...fromCard, slot_index: toIndex };
+    setSelectedBinder({ ...selectedBinder, cards: updatedCards });
   };
 
-  const createBinder = async (profileId, binderData) => {
-    setSyncing(true);
-    try {
-      const profile = profiles.find(p => p.id === profileId);
-      const totalSlots = binderData.rows * binderData.cols * binderData.pages;
-      const newBinder = {
-        id: Date.now().toString(),
-        ...binderData,
-        cards: Array(totalSlots).fill(null),
-        createdAt: new Date().toISOString()
-      };
-      
-      const updatedBinders = [...(profile.binders || []), newBinder];
-      await updateDoc(doc(db, 'profiles', profileId), {
-        binders: updatedBinders
-      });
-      setSyncing(false);
-    } catch (error) {
-      console.error('Error creating binder:', error);
-      setSyncing(false);
-      alert('Failed to create binder.');
+  // ── Cover edit save ───────────────────────────────────────────────────────
+  const handleEditBinderSave = async (coverData, imageFile) => {
+    let cover_image_url = coverData.cover_image_url;
+    if (imageFile) {
+      const url = await uploadBinderCover(selectedBinder.id, imageFile);
+      if (url) cover_image_url = url;
     }
+    await handleUpdateBinder(selectedBinder.id, {
+      cover_color: coverData.cover_color,
+      cover_text: coverData.cover_text,
+      cover_image_url,
+    });
+    setView('binderView');
   };
 
-  const updateBinder = async (profileId, binderId, updates) => {
-    setSyncing(true);
-    try {
-      const profile = profiles.find(p => p.id === profileId);
-      const updatedBinders = profile.binders.map(b => 
-        b.id === binderId ? { ...b, ...updates } : b
-      );
-      
-      await updateDoc(doc(db, 'profiles', profileId), {
-        binders: updatedBinders
-      });
-      setSyncing(false);
-    } catch (error) {
-      console.error('Error updating binder:', error);
-      setSyncing(false);
-      alert('Failed to update binder.');
-    }
-  };
-
-  const deleteBinder = async (profileId, binderId) => {
-    setSyncing(true);
-    try {
-      const profile = profiles.find(p => p.id === profileId);
-      const updatedBinders = profile.binders.filter(b => b.id !== binderId);
-      
-      await updateDoc(doc(db, 'profiles', profileId), {
-        binders: updatedBinders
-      });
-      setSyncing(false);
-    } catch (error) {
-      console.error('Error deleting binder:', error);
-      setSyncing(false);
-      alert('Failed to delete binder.');
-    }
-  };
-
-  const addCardToBinder = async (card) => {
-    if (selectedCell !== null && selectedBinder) {
-      const updatedCards = [...selectedBinder.cards];
-      updatedCards[selectedCell] = card;
-      
-      await updateBinder(currentProfile.id, selectedBinder.id, { cards: updatedCards });
-      setSelectedBinder({ ...selectedBinder, cards: updatedCards });
-      setSelectedCell(null);
-      setSearchResults([]);
-      setSearchQuery('');
-      setSearchFilters({ set: '', type: '', rarity: '', supertype: '', language: '' });
-      setSearchPage(1);
-      setTotalSearchPages(0);
-    }
-  };
-
-  const removeCardFromBinder = async (index) => {
-    if (selectedBinder) {
-      const updatedCards = [...selectedBinder.cards];
-      updatedCards[index] = null;
-      
-      await updateBinder(currentProfile.id, selectedBinder.id, { cards: updatedCards });
-      setSelectedBinder({ ...selectedBinder, cards: updatedCards });
-    }
-  };
-
-  const swapCards = async (fromIndex, toIndex) => {
-    if (selectedBinder && fromIndex !== toIndex) {
-      const updatedCards = [...selectedBinder.cards];
-      const temp = updatedCards[fromIndex];
-      updatedCards[fromIndex] = updatedCards[toIndex];
-      updatedCards[toIndex] = temp;
-      
-      await updateBinder(currentProfile.id, selectedBinder.id, { cards: updatedCards });
-      setSelectedBinder({ ...selectedBinder, cards: updatedCards });
-    }
-  };
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="app">
       <div className="container">
-        <div className="header">
-          <h1>
-            <Book size={40} style={{ marginRight: '15px' }} />
-            PokeBinder
-          </h1>
-          <p style={{ fontSize: '1.5rem' }}>Struggling bringing your binder everywhere you go? 
-            <br />Organize and showcase your Pokémon TCG collection here in PokéBinder!
-            <br />
-            <br />By: MrWack</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '10px' }}>
-            {syncing && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', opacity: 0.7 }}>
-                <RefreshCw size={16} className="spinning" />
-                <span style={{ fontSize: '0.9rem' }}>Syncing with Firebase...</span>
-              </div>
-            )}
-            <button 
-              className="btn btn-secondary" 
-              onClick={() => setShowSettings(!showSettings)}
-              style={{ marginLeft: 'auto' }}
-            >
-              <Settings size={20} />
-              Settings
-            </button>
+        <div className={`header${view === 'binderView' ? ' header--compact' : ''}`}>
+          <div className="header-top">
+            <h1>
+              <Book size={36} style={{ marginRight: '12px', flexShrink: 0, color: '#fbbf24' }} />
+              <span className="brand-text">PokéBinder</span>
+            </h1>
+            <div className="header-actions">
+              {syncing && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.65, fontSize: '0.85rem' }}>
+                  <RefreshCw size={14} className="spinning" />
+                  Syncing…
+                </div>
+              )}
+              <UserMenu />
+            </div>
           </div>
+          {view === 'binders' && (
+            <div className="header-nav">
+              <p className="header-subtitle">
+                Organize and showcase your Pokémon TCG collection digitally.
+              </p>
+              <div className="header-nav__links">
+                <button className="header-nav__btn" onClick={() => navigate('/sets')}>
+                  <Layers size={16} />Browse Sets
+                </button>
+                <button className="header-nav__btn" onClick={() => navigate('/stats')}>
+                  <BarChart2 size={16} />Statistics
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {showSettings && (
-          <SettingsPanel 
-            settings={appSettings}
-            onSave={saveAppSettings}
-            onClose={() => setShowSettings(false)}
-          />
-        )}
-
-        {view === 'profiles' && (
-          <ProfilesView 
-            profiles={profiles}
-            onCreateProfile={createProfile}
-            onSelectProfile={(profile) => {
-              setCurrentProfile(profile);
-              setView('binders');
-            }}
-            onDeleteProfile={deleteProfile}
-          />
-        )}
-
-        {view === 'binders' && currentProfile && (
+        {view === 'binders' && (
           <BindersView
-            profile={currentProfile}
-            onBack={() => {
-              setCurrentProfile(null);
-              setView('profiles');
-            }}
-            onCreateBinder={(binderData) => createBinder(currentProfile.id, binderData)}
-            onSelectBinder={(binder) => {
-              setSelectedBinder(binder);
-              setCurrentPage(0);
-              setView('binderView');
-            }}
-            onDeleteBinder={(binderId) => deleteBinder(currentProfile.id, binderId)}
+            profile={profile}
+            binders={binders}
+            onCreateBinder={handleCreateBinder}
+            onSelectBinder={handleSelectBinder}
+            onDeleteBinder={handleDeleteBinder}
+            onDuplicateBinder={handleDuplicateBinder}
           />
         )}
 
@@ -402,17 +411,20 @@ export default function PokemonBinderApp() {
               setSelectedBinder(null);
               setCurrentPage(0);
               setView('binders');
+              loadBinders();
             }}
             onEditCover={() => setView('editBinder')}
             selectedCell={selectedCell}
             onSelectCell={setSelectedCell}
-            onRemoveCard={removeCardFromBinder}
+            onRemoveCard={handleRemoveCard}
+            onCardClick={setModalCard}
+            onInspectCard={setInspectCard}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            onSearch={searchCards}
+            onSearch={handleSearch}
             searchResults={searchResults}
             loading={loading}
-            onAddCard={addCardToBinder}
+            onAddCard={handleAddCard}
             searchFilters={searchFilters}
             onFilterChange={setSearchFilters}
             sets={sets}
@@ -420,26 +432,68 @@ export default function PokemonBinderApp() {
             onToggleFilters={setShowFilters}
             searchPage={searchPage}
             totalSearchPages={totalSearchPages}
-            onSearchPageChange={(page) => searchCards(searchQuery, searchFilters, page)}
-            draggedCard={draggedCard}
-            onDragStart={setDraggedCard}
-            onDragEnd={() => setDraggedCard(null)}
-            onSwapCards={swapCards}
+            onSearchPageChange={(page) => handleSearch(searchQuery, searchFilters, page, searchSort, searchGame)}
+            onSwapCards={handleSwapCards}
+            searchSort={searchSort}
+            onSortChange={(sort) => { setSearchSort(sort); handleSearch(searchQuery, searchFilters, 1, sort, searchGame); }}
+            searchGame={searchGame}
+            onGameChange={(game) => { setSearchGame(game); setSearchResults([]); setSearchQuery(''); }}
+            currency={(() => { try { return JSON.parse(localStorage.getItem('pokemonBinderSettings') || '{}').currency || 'USD'; } catch { return 'USD'; } })()}
           />
         )}
 
         {view === 'editBinder' && selectedBinder && (
           <EditBinderCover
             binder={selectedBinder}
-            onSave={(updates) => {
-              updateBinder(currentProfile.id, selectedBinder.id, updates);
-              setSelectedBinder({ ...selectedBinder, ...updates });
-              setView('binderView');
-            }}
+            onSave={handleEditBinderSave}
             onCancel={() => setView('binderView')}
+          />
+        )}
+
+        {modalCard && (
+          <CardDetailModal
+            card={modalCard}
+            currency={(() => { try { return JSON.parse(localStorage.getItem('pokemonBinderSettings') || '{}').currency || 'USD'; } catch { return 'USD'; } })()}
+            onClose={() => setModalCard(null)}
+            onInspect={(card) => { setModalCard(null); setInspectCard(card); }}
+            onRemove={() => {
+              const slotIndex = selectedBinder?.cards.findIndex(c => c?.id === modalCard.id);
+              if (slotIndex !== undefined && slotIndex !== -1) handleRemoveCard(slotIndex);
+              setModalCard(null);
+            }}
+          />
+        )}
+
+        {inspectCard && (
+          <CardInspectModal
+            card={inspectCard}
+            onClose={() => setInspectCard(null)}
           />
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Root ─────────────────────────────────────────────────────────────────────
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
+          <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+          <Route path="/stats" element={<ProtectedRoute><StatsPage /></ProtectedRoute>} />
+          <Route path="/sets" element={<ProtectedRoute><SetsPage /></ProtectedRoute>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
