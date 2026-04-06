@@ -199,6 +199,21 @@ RLS is enabled on all three tables — policies enforce users can only access th
 
 ---
 
+## Performance & Security Audit (completed 2026-04-04)
+
+### Issues found and fixed
+
+| Area | Issue | Fix applied |
+|---|---|---|
+| Auth refresh | `setLoading(false)` blocked by `ensureProfile()` DB call → circular spinner on hard refresh | Moved `setLoading(false)` before `ensureProfile()`; 10s fallback timer |
+| 3D inspect modal | React state updates on every mousemove → 60fps reconciliation jank | Rewrote to use `useRef` + direct DOM mutation + `requestAnimationFrame`; `will-change: transform`; `.inspect-card-wrap--settling` CSS class for smooth return-to-centre |
+| Bundle size | Recharts (~300KB), SettingsPage, SetsPage loaded eagerly on first paint | `React.lazy()` + `<Suspense>` for SettingsPage, StatsPage, SetsPage |
+| Memory leak | `pointermove`/`pointerup` window listeners in CardSlot leaked if component unmounted mid-press | `cancelLongPressRef` + `useEffect` cleanup |
+| Input validation | Binder name, cover text, display name had no `maxLength` | `maxLength={60}` on binder name, `maxLength={40}` on cover text, `maxLength={50}` on display name |
+| Security headers | No HTTP security headers on Vercel responses | Created `vercel.json` with X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy |
+
+---
+
 ## Feature Accessibility Checklist
 
 After implementing or modifying any feature, always verify it is **reachable by the user** in the live app. A feature that exists in code but is not wired up or pushed is invisible to the user.
@@ -229,3 +244,8 @@ A running log of mistakes made across sessions. Future instances must read this 
 | 5 | Started dev server without opening browser | User asked to "run the app" but only the terminal process was started. | Always run `npm run dev` AND `start chrome http://localhost:5173` together. Never just start the server. |
 | 6 | Tried to height-constrain the binder to fit the viewport | Set `height: calc(100vh - 265px)` with `aspect-ratio: unset` on card slots — cards became very small. User rejected it. | Binder page mode must be scrollable. Keep `aspect-ratio: 2.5/3.5` on card slots and let the page grow naturally. Never cap the binder height. |
 | 7 | Planned to use "Scrydex API" for Phase 3 multi-game | Scrydex does not exist as a production API. | Use Scryfall (MTG) and YGOPRODeck (YGO) — both are free REST APIs, no auth, CORS-safe. |
+| 8 | `setLoading(false)` blocked by `ensureProfile()` DB call | On page refresh, `AuthContext` waited for a Supabase profile fetch before showing the app, causing a circular loading spinner. | Call `setLoading(false)` immediately after `setUser()`. `ensureProfile()` can run async afterward — `ProtectedRoute` only needs `user`, not `profile`. |
+| 9 | React state for 3D tilt/shine caused 60fps re-renders | Using `useState` for `tilt`/`shine` in `CardInspectModal` triggered React reconciliation on every mousemove frame causing visible jank. | Use `useRef` + direct DOM style mutation + `requestAnimationFrame`. Zero React re-renders on movement — only `flipped` state needed. |
+| 10 | window event listeners in CardSlot never cleaned up on unmount | `pointermove`/`pointerup` added to window inside `handlePointerDown` were only removed when the press sequence completed. If the component unmounted mid-press (e.g. navigating away), listeners leaked. | Store the cancel function in a ref; add a `useEffect` cleanup that calls `cancelLongPressRef.current?.()` and `clearTimeout(longPressRef.current)`. |
+| 11 | Broke multi-line CSS rule by replacing only the opening `{` | When adding `position: relative` to `.sets-browse-card`, the Edit matched only `{` which left the rest of the rule as orphaned CSS. | Always read the full selector + declaration block, then replace the entire rule at once. Never match just `{`. |
+| 12 | Missing `</div>` when inserting JSX into SetsPage | Added an owned-badge `<div>` inside set-detail-info but forgot its closing tag, breaking the JSX tree. | After inserting any new JSX block, count open/close tags before saving. |

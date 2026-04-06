@@ -2,23 +2,23 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { X, RotateCcw, FlipHorizontal } from 'lucide-react';
 
 /**
- * CardInspectModal — immersive 3D card inspection.
+ * CardInspectModal — GPU-accelerated 3D card inspection.
  *
- * Triggered by long-pressing any card. Shows a full-screen overlay with a
- * 3D tilt effect: moving the cursor (or finger) over the card rotates it
- * and casts a dynamic shine/holographic highlight.
- *
- * Props:
- *   card       — normalised card object (DB row or API shape)
- *   onClose    — callback to dismiss
+ * Performance strategy:
+ *  - Tilt and shine are applied via direct DOM style mutation (no React state),
+ *    so mousemove NEVER triggers a React re-render.
+ *  - All frame updates go through requestAnimationFrame — one paint per frame max.
+ *  - `will-change: transform` on the card forces a dedicated GPU compositor layer.
+ *  - CSS transition is removed during active movement and re-applied on mouse leave
+ *    so the "return to centre" is smooth without queuing transition frames on every move.
  */
 export default function CardInspectModal({ card, onClose }) {
-  const cardRef = useRef(null);
-  const [tilt, setTilt]     = useState({ x: 0, y: 0 });
-  const [shine, setShine]   = useState({ x: 50, y: 50 });
+  const wrapRef  = useRef(null);   // the 3D-tilting div
+  const shineRef = useRef(null);   // holographic overlay
+  const rafRef   = useRef(null);   // pending rAF id
   const [flipped, setFlipped] = useState(false);
 
-  // Resolve card images ─────────────────────────────────────────────────────
+  // ── Image resolution ───────────────────────────────────────────────────────
   const isDbCard   = !!card.card_image_url;
   const frontImage = isDbCard
     ? card.card_image_url
@@ -27,35 +27,60 @@ export default function CardInspectModal({ card, onClose }) {
   const currentImage = flipped && backImage ? backImage : frontImage;
   const cardName   = isDbCard ? card.card_name : card.name;
 
-  // Dismiss on Escape ───────────────────────────────────────────────────────
+  // ── Escape key ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const h = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', h);
-    return () => document.removeEventListener('keydown', h);
+    return () => {
+      document.removeEventListener('keydown', h);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
   }, [onClose]);
 
-  // 3D tilt from pointer position ───────────────────────────────────────────
+  // ── Pointer move — direct DOM, zero React re-renders ──────────────────────
   const handlePointerMove = useCallback((e) => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
+    if (!wrapRef.current || !shineRef.current) return;
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    const x = (clientX - rect.left) / rect.width;   // 0..1
-    const y = (clientY - rect.top)  / rect.height;  // 0..1
-    setTilt({ x: (y - 0.5) * -28, y: (x - 0.5) * 28 });
-    setShine({ x: x * 100, y: y * 100 });
+
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      const rect = wrapRef.current.getBoundingClientRect();
+      const x = Math.min(1, Math.max(0, (clientX - rect.left)  / rect.width));
+      const y = Math.min(1, Math.max(0, (clientY - rect.top)   / rect.height));
+      const tX = (y - 0.5) * -26;
+      const tY = (x - 0.5) *  26;
+
+      // Remove settling transition so rapid moves aren't queued
+      wrapRef.current.classList.remove('inspect-card-wrap--settling');
+      wrapRef.current.style.transform =
+        `perspective(700px) rotateX(${tX}deg) rotateY(${tY}deg) scale(1.05)`;
+
+      shineRef.current.style.background =
+        `radial-gradient(circle at ${x * 100}% ${y * 100}%, ` +
+        `rgba(255,255,255,0.30) 0%, rgba(210,190,255,0.14) 28%, transparent 62%)`;
+    });
   }, []);
 
   const handlePointerLeave = useCallback(() => {
-    setTilt({ x: 0, y: 0 });
-    setShine({ x: 50, y: 50 });
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (!wrapRef.current || !shineRef.current) return;
+    // Add smooth settling transition back for the return-to-centre animation
+    wrapRef.current.classList.add('inspect-card-wrap--settling');
+    wrapRef.current.style.transform =
+      'perspective(700px) rotateX(0deg) rotateY(0deg) scale(1.04)';
+    shineRef.current.style.background =
+      'radial-gradient(circle at 50% 50%, rgba(255,255,255,0.06) 0%, transparent 60%)';
   }, []);
 
-  const resetTilt = () => { setTilt({ x: 0, y: 0 }); setShine({ x: 50, y: 50 }); };
+  const handleReset = useCallback(() => {
+    handlePointerLeave();
+  }, [handlePointerLeave]);
 
   return (
     <div className="inspect-overlay" onClick={onClose}>
-      {/* Controls */}
+
+      {/* Top bar */}
       <div className="inspect-controls" onClick={e => e.stopPropagation()}>
         <span className="inspect-card-name">{cardName}</span>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -64,7 +89,7 @@ export default function CardInspectModal({ card, onClose }) {
               <FlipHorizontal size={18} />
             </button>
           )}
-          <button className="inspect-btn" onClick={resetTilt} title="Reset tilt">
+          <button className="inspect-btn" onClick={handleReset} title="Reset tilt">
             <RotateCcw size={18} />
           </button>
           <button className="inspect-btn inspect-btn--close" onClick={onClose} title="Close">
@@ -73,16 +98,15 @@ export default function CardInspectModal({ card, onClose }) {
         </div>
       </div>
 
-      {/* 3D card */}
+      {/* 3D stage — pointer events handled here so touch works */}
       <div className="inspect-stage" onClick={e => e.stopPropagation()}>
         <div
-          ref={cardRef}
+          ref={wrapRef}
           className="inspect-card-wrap"
           onMouseMove={handlePointerMove}
           onMouseLeave={handlePointerLeave}
           onTouchMove={handlePointerMove}
           onTouchEnd={handlePointerLeave}
-          style={{ transform: `perspective(700px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale(1.04)` }}
         >
           <img
             src={currentImage}
@@ -90,19 +114,14 @@ export default function CardInspectModal({ card, onClose }) {
             className="inspect-card-img"
             draggable={false}
           />
-          {/* Holographic shine overlay */}
-          <div
-            className="inspect-shine"
-            style={{
-              background: `radial-gradient(circle at ${shine.x}% ${shine.y}%, rgba(255,255,255,0.28) 0%, rgba(200,180,255,0.12) 30%, transparent 65%)`,
-            }}
-          />
-          {/* Edge gloss */}
+          <div ref={shineRef} className="inspect-shine" />
           <div className="inspect-gloss" />
         </div>
       </div>
 
-      <p className="inspect-hint">Move cursor to rotate · {backImage ? 'Flip for back face · ' : ''}Click outside to close</p>
+      <p className="inspect-hint">
+        Move cursor to rotate{backImage ? ' · Flip for back face' : ''} · Click outside to close
+      </p>
     </div>
   );
 }

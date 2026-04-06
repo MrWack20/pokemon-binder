@@ -19,26 +19,38 @@ function CardSlot({ absoluteIndex, card, isSelected, onSelectCell, onRemoveCard,
   });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: absoluteIndex });
   const longPressRef = useRef(null);
+  const cancelLongPressRef = useRef(null);
 
   const setRef = useCallback(
     (node) => { setDragRef(node); setDropRef(node); },
     [setDragRef, setDropRef],
   );
 
+  // Clean up on unmount — prevents orphaned window listeners and timers
+  useEffect(() => {
+    return () => {
+      clearTimeout(longPressRef.current);
+      cancelLongPressRef.current?.();
+    };
+  }, []);
+
   function handlePointerDown(e) {
     if (!card) return;
     const startX = e.clientX, startY = e.clientY;
     longPressRef.current = setTimeout(() => {
       onInspectCard?.(card);
+      cancelLongPressRef.current = null;
     }, 450);
     function cancel() {
       clearTimeout(longPressRef.current);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', cancel);
+      cancelLongPressRef.current = null;
     }
     function onMove(ev) {
       if (Math.abs(ev.clientX - startX) > 6 || Math.abs(ev.clientY - startY) > 6) cancel();
     }
+    cancelLongPressRef.current = cancel;
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', cancel);
   }

@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Book, RefreshCw, Layers, BarChart2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import './App.css';
 import { supabase } from './supabase.js';
 import { BACKGROUND_THEMES } from './constants/themes';
-import SettingsPage from './components/SettingsPage';
-import StatsPage from './components/StatsPage';
-import SetsPage from './components/SetsPage';
+// Heavy pages loaded lazily — reduces initial bundle by ~300KB (Recharts)
+const SettingsPage    = lazy(() => import('./components/SettingsPage'));
+const StatsPage       = lazy(() => import('./components/StatsPage'));
+const SetsPage        = lazy(() => import('./components/SetsPage'));
 import CardDetailModal from './components/CardDetailModal';
 import CardInspectModal from './components/CardInspectModal';
 import BindersView from './components/BindersView';
@@ -75,6 +76,16 @@ function buildCardsArray(rows, cols, pages, cardRows) {
     }
   });
   return arr;
+}
+
+// ─── Lazy-load fallback ───────────────────────────────────────────────────────
+
+function PageLoader() {
+  return (
+    <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: '36px', height: '36px', border: '3px solid rgba(255,255,255,0.15)', borderTop: '3px solid #fbbf24', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+    </div>
+  );
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
@@ -488,9 +499,9 @@ export default function App() {
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-          <Route path="/stats" element={<ProtectedRoute><StatsPage /></ProtectedRoute>} />
-          <Route path="/sets" element={<ProtectedRoute><SetsPage /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Suspense fallback={<PageLoader />}><SettingsPage /></Suspense></ProtectedRoute>} />
+          <Route path="/stats"    element={<ProtectedRoute><Suspense fallback={<PageLoader />}><StatsPage /></Suspense></ProtectedRoute>} />
+          <Route path="/sets"     element={<ProtectedRoute><Suspense fallback={<PageLoader />}><SetsPage /></Suspense></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>

@@ -1933,26 +1933,36 @@ input[type="number"].input::-webkit-outer-spin-button {
 
 .inspect-stage {
   cursor: default; user-select: none;
+  /* GPU-composited drop shadow keeps shadow on its own layer */
   filter: drop-shadow(0 30px 80px rgba(0,0,0,0.7));
-  will-change: transform;
 }
 .inspect-card-wrap {
   position: relative;
-  transition: transform 0.06s ease;
   border-radius: 16px;
+  /* Force dedicated GPU compositor layer — eliminates layout/paint on every tilt */
+  will-change: transform;
+  transform: perspective(700px) rotateX(0deg) rotateY(0deg) scale(1.04);
+  /* No transition during active movement — added back by JS on mouse leave */
+}
+.inspect-card-wrap--settling {
+  /* Smooth return to centre only */
+  transition: transform 0.45s cubic-bezier(0.23, 1, 0.32, 1);
 }
 .inspect-card-img {
   display: block;
   width: min(360px, 80vw);
   border-radius: 16px;
   pointer-events: none;
+  /* Promote image to its own layer so tilt doesn't repaint pixels */
+  will-change: transform;
+  transform: translateZ(0);
 }
 .inspect-shine {
   position: absolute; inset: 0;
   border-radius: 16px;
   pointer-events: none;
   mix-blend-mode: screen;
-  transition: background 0.06s ease;
+  /* background updated directly by JS — no CSS transition needed here */
 }
 .inspect-gloss {
   position: absolute; inset: 0;
