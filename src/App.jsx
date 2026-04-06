@@ -293,18 +293,7 @@ function Dashboard() {
     try {
       const { data: cardRows, error } = await getBinderCards(binder.id);
       if (error) {
-        console.error('getBinderCards error:', error);
-        // Retry once
-        const retry = await getBinderCards(binder.id);
-        if (retry.error) {
-          toast.error('Failed to load binder. Check your connection and try again.');
-          setSyncing(false);
-          return;
-        }
-        const cards = buildCardsArray(binder.rows, binder.cols, binder.pages, retry.data);
-        setSelectedBinder({ ...binder, cards });
-        setCurrentPage(0);
-        setView('binderView');
+        toast.error('Failed to load binder. Check your connection and try again.');
         setSyncing(false);
         return;
       }
