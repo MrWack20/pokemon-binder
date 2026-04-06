@@ -61,6 +61,21 @@ export default function CardDetailModal({ card, currency = 'USD', onClose, onRem
     if (raw.atk != null) extraRows.push({ label: 'ATK / DEF', value: `${raw.atk} / ${raw.def ?? '?'}` });
     if (raw.level)      extraRows.push({ label: 'Level',   value: String(raw.level) });
     if (raw.desc)       extraRows.push({ label: 'Effect',  value: raw.desc });
+  } else if (game === 'onepiece') {
+    const raw  = card._raw || card;
+    name      = card.name || raw.card_name || 'Unknown';
+    imageUrl  = card.images?.large || card.images?.small || raw.card_image || '';
+    setName   = card.set?.name || raw.set_name;
+    number    = card.number || raw.card_set_id;
+    rarity    = card.rarity || raw.rarity;
+    price     = card._price;
+    priceSource = 'TCGPlayer';
+    if (raw.card_color)  extraRows.push({ label: 'Color',  value: raw.card_color });
+    if (raw.card_type)   extraRows.push({ label: 'Type',   value: raw.card_type });
+    if (raw.card_cost)   extraRows.push({ label: 'Cost',   value: String(raw.card_cost) });
+    if (raw.card_power)  extraRows.push({ label: 'Power',  value: String(raw.card_power) });
+    if (raw.sub_types)   extraRows.push({ label: 'Traits', value: raw.sub_types });
+    if (raw.card_text)   extraRows.push({ label: 'Effect', value: raw.card_text });
   } else {
     // Pokemon TCG API or normalised pokemon card
     name      = card.name;
@@ -81,7 +96,7 @@ export default function CardDetailModal({ card, currency = 'USD', onClose, onRem
     if (card.hp)                 extraRows.push({ label: 'HP',        value: card.hp });
   }
 
-  const GAME_BADGE = { pokemon: '🎴 Pokémon TCG', mtg: '⚔️ Magic: The Gathering', yugioh: '🐉 Yu-Gi-Oh!' };
+  const GAME_BADGE = { pokemon: '🎴 Pokémon TCG', mtg: '⚔️ Magic: The Gathering', yugioh: '🐉 Yu-Gi-Oh!', onepiece: '🏴‍☠️ One Piece TCG' };
 
   // Escape key handler
   useEffect(() => {

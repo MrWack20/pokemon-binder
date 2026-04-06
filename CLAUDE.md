@@ -50,7 +50,8 @@ These roadmap items from Phase 2 are NOT yet implemented:
 The roadmap referenced "Scrydex API (GraphQL)" — this API does not exist as a production service. Phase 3 was implemented using:
 - **Scryfall API** (REST) for Magic: The Gathering — `src/services/mtgService.js`
 - **YGOPRODeck API** (REST) for Yu-Gi-Oh! — `src/services/yugiohService.js`
-- No GraphQL client was needed; both APIs are REST with CORS support, no auth required.
+- **OPTCG API** (REST) for One Piece TCG — `src/services/onepieceService.js` (base: `https://www.optcgapi.com/api/`)
+- No GraphQL client was needed; all APIs are REST with CORS support, no auth required.
 
 New services normalize all game cards to a shared display shape: `{ id, name, images: { small, large }, set: { name }, _game, _price, _raw }`. This shape is compatible with the existing Pokemon TCG API shape so BinderView requires minimal changes.
 
@@ -205,7 +206,11 @@ RLS is enabled on all three tables — policies enforce users can only access th
 
 | Area | Issue | Fix applied |
 |---|---|---|
-| Auth refresh | `setLoading(false)` blocked by `ensureProfile()` DB call → circular spinner on hard refresh | Moved `setLoading(false)` before `ensureProfile()`; 10s fallback timer |
+| Auth refresh | `setLoading(false)` blocked by `ensureProfile()` DB call → circular spinner on hard refresh | Moved `setLoading(false)` before `ensureProfile()`; 8s fallback timer |
+| Auth stability | `ensureProfile()` failure on token refresh nulled out profile → binders disappeared | Added retry logic (3 attempts with back-off); never null out existing profile on transient error; skip re-fetch on `TOKEN_REFRESHED` if profile exists |
+| Auth persistence | Supabase client used default auth config — session could be lost on refresh | Explicit `persistSession: true`, `autoRefreshToken: true`, `storageKey: 'pokebinder-auth'` |
+| Binder fetch | `loadBinders` had no retry — single failure left dashboard empty | Returns error info; auto-retries once after 2s on failure |
+| Card fetch | `handleSelectBinder` had no retry — network blip left binder empty | Auto-retries once on failure before showing error toast |
 | 3D inspect modal | React state updates on every mousemove → 60fps reconciliation jank | Rewrote to use `useRef` + direct DOM mutation + `requestAnimationFrame`; `will-change: transform`; `.inspect-card-wrap--settling` CSS class for smooth return-to-centre |
 | Bundle size | Recharts (~300KB), SettingsPage, SetsPage loaded eagerly on first paint | `React.lazy()` + `<Suspense>` for SettingsPage, StatsPage, SetsPage |
 | Memory leak | `pointermove`/`pointerup` window listeners in CardSlot leaked if component unmounted mid-press | `cancelLongPressRef` + `useEffect` cleanup |

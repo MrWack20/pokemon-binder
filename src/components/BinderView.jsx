@@ -462,6 +462,7 @@ export default function BinderView({
                 { id: 'pokemon', label: '🎴 Pokémon' },
                 { id: 'mtg',     label: '⚔️ MTG' },
                 { id: 'yugioh',  label: '🐉 Yu-Gi-Oh!' },
+                { id: 'onepiece', label: '🏴‍☠️ One Piece' },
               ].map(g => (
                 <button
                   key={g.id}

@@ -39,6 +39,7 @@ import {
 import { searchCards as searchCardsSvc, getSets, addRecentSearch } from './services/searchService.js';
 import { searchMtgCards, mtgCardToDbRow } from './services/mtgService.js';
 import { searchYgoCards, ygoCardToDbRow } from './services/yugiohService.js';
+import { searchOpCards, opCardToDbRow } from './services/onepieceService.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -127,8 +128,18 @@ function Dashboard() {
     loadAppSettings();
   }, []);
 
+  // Load binders when profile becomes available; retry once if it fails
   useEffect(() => {
-    if (profile?.id) loadBinders();
+    if (!profile?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { error } = await loadBinders();
+      if (error && !cancelled) {
+        // Retry once after 2s on transient failure
+        setTimeout(() => { if (!cancelled) loadBinders(); }, 2000);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [profile]);
 
   useEffect(() => {
@@ -150,11 +161,23 @@ function Dashboard() {
 
   // ── Data loaders ──────────────────────────────────────────────────────────
   const loadBinders = async () => {
+    if (!profile?.id) return { error: new Error('No profile') };
     setSyncing(true);
-    const { data, error } = await getBinders(profile.id);
-    if (error) console.error('Error loading binders:', error);
-    else setBinders(data || []);
-    setSyncing(false);
+    try {
+      const { data, error } = await getBinders(profile.id);
+      if (error) {
+        console.error('Error loading binders:', error);
+        setSyncing(false);
+        return { error };
+      }
+      setBinders(data || []);
+      setSyncing(false);
+      return { error: null };
+    } catch (err) {
+      console.error('loadBinders exception:', err);
+      setSyncing(false);
+      return { error: err };
+    }
   };
 
   const loadSetsData = async () => {
@@ -173,6 +196,8 @@ function Dashboard() {
       result = await searchMtgCards(query, page);
     } else if (game === 'yugioh') {
       result = await searchYgoCards(query, page);
+    } else if (game === 'onepiece') {
+      result = await searchOpCards(query, page);
     } else {
       result = await searchCardsSvc(query, filters, page, sort);
     }
@@ -255,12 +280,32 @@ function Dashboard() {
   // ── Open binder: fetch cards and reconstruct slot array ───────────────────
   const handleSelectBinder = async (binder) => {
     setSyncing(true);
-    const { data: cardRows, error } = await getBinderCards(binder.id);
-    if (error) { toast.error('Failed to load binder.'); setSyncing(false); return; }
-    const cards = buildCardsArray(binder.rows, binder.cols, binder.pages, cardRows);
-    setSelectedBinder({ ...binder, cards });
-    setCurrentPage(0);
-    setView('binderView');
+    try {
+      const { data: cardRows, error } = await getBinderCards(binder.id);
+      if (error) {
+        console.error('getBinderCards error:', error);
+        // Retry once
+        const retry = await getBinderCards(binder.id);
+        if (retry.error) {
+          toast.error('Failed to load binder. Check your connection and try again.');
+          setSyncing(false);
+          return;
+        }
+        const cards = buildCardsArray(binder.rows, binder.cols, binder.pages, retry.data);
+        setSelectedBinder({ ...binder, cards });
+        setCurrentPage(0);
+        setView('binderView');
+        setSyncing(false);
+        return;
+      }
+      const cards = buildCardsArray(binder.rows, binder.cols, binder.pages, cardRows);
+      setSelectedBinder({ ...binder, cards });
+      setCurrentPage(0);
+      setView('binderView');
+    } catch (err) {
+      console.error('handleSelectBinder exception:', err);
+      toast.error('Failed to load binder.');
+    }
     setSyncing(false);
   };
 
@@ -281,6 +326,8 @@ function Dashboard() {
       dbRow = mtgCardToDbRow(apiCard);
     } else if (game === 'yugioh') {
       dbRow = ygoCardToDbRow(apiCard);
+    } else if (game === 'onepiece') {
+      dbRow = opCardToDbRow(apiCard);
     } else {
       dbRow = {
         card_api_id: apiCard.id,
@@ -388,7 +435,7 @@ function Dashboard() {
           {view === 'binders' && (
             <div className="header-nav">
               <p className="header-subtitle">
-                Organize and showcase your Pokémon TCG collection digitally.
+                Organize and showcase your TCG collection digitally.
               </p>
               <div className="header-nav__links">
                 <button className="header-nav__btn" onClick={() => navigate('/sets')}>
