@@ -134,6 +134,7 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
               <option value="pokemon">🎴 Pokémon TCG</option>
               <option value="mtg">⚔️ Magic: The Gathering</option>
               <option value="yugioh">🐉 Yu-Gi-Oh!</option>
+              <option value="onepiece">🏴‍☠️ One Piece TCG</option>
             </select>
           </div>
           <div className="form-group">

@@ -86,7 +86,7 @@ export async function getCollectionStats(profileId) {
     gameMap[g].count++;
     gameMap[g].value += c.card_price || 0;
   });
-  const GAME_LABELS = { pokemon: 'Pokémon', mtg: 'Magic: TG', yugioh: 'Yu-Gi-Oh!' };
+  const GAME_LABELS = { pokemon: 'Pokémon', mtg: 'Magic: TG', yugioh: 'Yu-Gi-Oh!', onepiece: 'One Piece' };
   const gameBreakdown = Object.values(gameMap)
     .sort((a, b) => b.count - a.count)
     .map(g => ({ ...g, label: GAME_LABELS[g.game] || g.game, value: +g.value.toFixed(2) }));

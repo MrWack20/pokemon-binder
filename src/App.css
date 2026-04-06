@@ -1814,8 +1814,8 @@ input[type="number"].input::-webkit-outer-spin-button {
   color: #fbbf24;
 }
 
-/* ── Sets page: language toggle ──────────────────────────────────────────── */
-.sets-lang-toggle {
+/* ── Sets page: game tabs ──────────────────────────────────────────────── */
+.sets-game-tabs {
   display: flex;
   gap: 0;
   background: rgba(255,255,255,0.06);
@@ -1823,40 +1823,47 @@ input[type="number"].input::-webkit-outer-spin-button {
   border-radius: 12px;
   padding: 4px;
   margin-bottom: 20px;
-  width: fit-content;
 }
 
-.sets-lang-btn {
-  padding: 8px 20px;
+.sets-game-tab {
+  padding: 8px 18px;
   border: none;
   border-radius: 8px;
   background: transparent;
   color: rgba(255,255,255,0.55);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
 }
 
-.sets-lang-btn.active {
+.sets-game-tab.active {
   background: rgba(59,130,246,0.3);
   color: #93c5fd;
 }
 
-.sets-lang-btn:hover:not(.active) {
+.sets-game-tab:hover:not(.active) {
   background: rgba(255,255,255,0.07);
   color: white;
 }
 
-.sets-jp-notice {
+.sets-empty-state {
   display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  background: rgba(251,191,36,0.08);
-  border: 1px solid rgba(251,191,36,0.2);
-  border-radius: 14px;
-  padding: 18px 20px;
-  margin-bottom: 20px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.sets-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 16px 0;
 }
 
 @media (max-width: 767px) {
@@ -1870,12 +1877,16 @@ input[type="number"].input::-webkit-outer-spin-button {
     padding: 7px 12px;
     font-size: 0.82rem;
   }
-  .sets-lang-toggle {
+  .sets-game-tabs {
     width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
-  .sets-lang-btn {
+  .sets-game-tab {
     flex: 1;
     text-align: center;
+    padding: 8px 10px;
+    font-size: 0.78rem;
   }
 }
 
