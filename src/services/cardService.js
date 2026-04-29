@@ -16,11 +16,15 @@ export async function getBinderCards(binderId) {
  */
 export async function addCard(binderId, slotIndex, cardData) {
   await ensureValidSession();
-  await supabase
+  // If the DELETE silently fails (e.g. RLS denies it), the INSERT will hit the
+  // UNIQUE(binder_id, slot_index) constraint with a confusing error. Surface
+  // the real problem instead.
+  const { error: deleteError } = await supabase
     .from('binder_cards')
     .delete()
     .eq('binder_id', binderId)
     .eq('slot_index', slotIndex);
+  if (deleteError) return { data: null, error: deleteError };
 
   const { data, error } = await supabase
     .from('binder_cards')

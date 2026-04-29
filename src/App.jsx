@@ -326,47 +326,55 @@ function Dashboard() {
       console.warn('handleAddCard: selectedCell=', selectedCell, 'selectedBinder=', selectedBinder);
       return;
     }
-    const game = apiCard._game ?? 'pokemon';
-    let dbRow;
-    if (game === 'mtg') {
-      dbRow = mtgCardToDbRow(apiCard);
-    } else if (game === 'yugioh') {
-      dbRow = ygoCardToDbRow(apiCard);
-    } else if (game === 'onepiece') {
-      dbRow = opCardToDbRow(apiCard);
-    } else {
-      dbRow = {
-        card_api_id: apiCard.id,
-        card_name: apiCard.name,
-        card_image_url: apiCard.images?.small ?? apiCard.images?.large ?? '',
-        card_set: apiCard.set?.name ?? null,
-        card_game: 'pokemon',
-        card_price: apiCard._price
-          ?? apiCard.tcgplayer?.prices?.holofoil?.market
-          ?? apiCard.tcgplayer?.prices?.normal?.market
-          ?? apiCard.tcgplayer?.prices?.['1stEditionHolofoil']?.market
-          ?? apiCard.tcgplayer?.prices?.unlimited?.market
-          ?? null,
-        card_price_currency: 'USD',
-      };
-    }
-    const { data, error } = await addCard(selectedBinder.id, selectedCell, dbRow);
-    if (error || !data) {
-      console.error('addCard error:', error);
-      toast.error(`Failed to add card: ${error?.message ?? 'unknown error'}`);
-      return;
-    }
+    setSyncing(true);
+    try {
+      const game = apiCard._game ?? 'pokemon';
+      let dbRow;
+      if (game === 'mtg') {
+        dbRow = mtgCardToDbRow(apiCard);
+      } else if (game === 'yugioh') {
+        dbRow = ygoCardToDbRow(apiCard);
+      } else if (game === 'onepiece') {
+        dbRow = opCardToDbRow(apiCard);
+      } else {
+        dbRow = {
+          card_api_id: apiCard.id,
+          card_name: apiCard.name,
+          card_image_url: apiCard.images?.small ?? apiCard.images?.large ?? '',
+          card_set: apiCard.set?.name ?? null,
+          card_game: 'pokemon',
+          card_price: apiCard._price
+            ?? apiCard.tcgplayer?.prices?.holofoil?.market
+            ?? apiCard.tcgplayer?.prices?.normal?.market
+            ?? apiCard.tcgplayer?.prices?.['1stEditionHolofoil']?.market
+            ?? apiCard.tcgplayer?.prices?.unlimited?.market
+            ?? null,
+          card_price_currency: 'USD',
+        };
+      }
+      const { data, error } = await addCard(selectedBinder.id, selectedCell, dbRow);
+      if (error || !data) {
+        console.error('addCard error:', error);
+        toast.error(`Failed to add card: ${error?.message ?? 'unknown error'}`);
+        return;
+      }
 
-    const updatedCards = [...selectedBinder.cards];
-    updatedCards[selectedCell] = data;
-    setSelectedBinder({ ...selectedBinder, cards: updatedCards });
-    setSelectedCell(null);
-    setSearchResults([]);
-    setSearchQuery('');
-    setSearchFilters({ set: '', type: '', rarity: '', supertype: '', language: '' });
-    setSearchPage(1);
-    setTotalSearchPages(0);
-    toast.success(`${data.card_name} added!`);
+      const updatedCards = [...selectedBinder.cards];
+      updatedCards[selectedCell] = data;
+      setSelectedBinder({ ...selectedBinder, cards: updatedCards });
+      setSelectedCell(null);
+      setSearchResults([]);
+      setSearchQuery('');
+      setSearchFilters({ set: '', type: '', rarity: '', supertype: '', language: '' });
+      setSearchPage(1);
+      setTotalSearchPages(0);
+      toast.success(`${data.card_name} added!`);
+    } catch (err) {
+      console.error('handleAddCard:', err);
+      toast.error('Failed to add card.');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   /** Remove a card by its slot index. Uses the DB row id stored in the slot. */
@@ -374,11 +382,19 @@ function Dashboard() {
     if (!selectedBinder) return;
     const card = selectedBinder.cards[slotIndex];
     if (!card) return;
-    const { error } = await removeCard(card.id);
-    if (error) { toast.error('Failed to remove card.'); return; }
-    const updatedCards = [...selectedBinder.cards];
-    updatedCards[slotIndex] = null;
-    setSelectedBinder({ ...selectedBinder, cards: updatedCards });
+    setSyncing(true);
+    try {
+      const { error } = await removeCard(card.id);
+      if (error) { toast.error('Failed to remove card.'); return; }
+      const updatedCards = [...selectedBinder.cards];
+      updatedCards[slotIndex] = null;
+      setSelectedBinder({ ...selectedBinder, cards: updatedCards });
+    } catch (err) {
+      console.error('handleRemoveCard:', err);
+      toast.error('Failed to remove card.');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   /**
@@ -391,31 +407,47 @@ function Dashboard() {
     const toCard = selectedBinder.cards[toIndex];
     if (!fromCard) return;
 
-    const { error } = fromCard && toCard
-      ? await swapCardsSvc(fromCard.id, toCard.id)
-      : await moveCard(fromCard.id, toIndex);
+    setSyncing(true);
+    try {
+      const { error } = fromCard && toCard
+        ? await swapCardsSvc(fromCard.id, toCard.id)
+        : await moveCard(fromCard.id, toIndex);
 
-    if (error) { toast.error('Failed to move card.'); return; }
+      if (error) { toast.error('Failed to move card.'); return; }
 
-    const updatedCards = [...selectedBinder.cards];
-    updatedCards[fromIndex] = toCard ? { ...toCard, slot_index: fromIndex } : null;
-    updatedCards[toIndex] = { ...fromCard, slot_index: toIndex };
-    setSelectedBinder({ ...selectedBinder, cards: updatedCards });
+      const updatedCards = [...selectedBinder.cards];
+      updatedCards[fromIndex] = toCard ? { ...toCard, slot_index: fromIndex } : null;
+      updatedCards[toIndex] = { ...fromCard, slot_index: toIndex };
+      setSelectedBinder({ ...selectedBinder, cards: updatedCards });
+    } catch (err) {
+      console.error('handleSwapCards:', err);
+      toast.error('Failed to move card.');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   // ── Cover edit save ───────────────────────────────────────────────────────
   const handleEditBinderSave = async (coverData, imageFile) => {
-    let cover_image_url = coverData.cover_image_url;
-    if (imageFile) {
-      const url = await uploadBinderCover(selectedBinder.id, imageFile);
-      if (url) cover_image_url = url;
+    setSyncing(true);
+    try {
+      let cover_image_url = coverData.cover_image_url;
+      if (imageFile) {
+        const url = await uploadBinderCover(selectedBinder.id, imageFile);
+        if (url) cover_image_url = url;
+      }
+      await handleUpdateBinder(selectedBinder.id, {
+        cover_color: coverData.cover_color,
+        cover_text: coverData.cover_text,
+        cover_image_url,
+      });
+      setView('binderView');
+    } catch (err) {
+      console.error('handleEditBinderSave:', err);
+      toast.error('Failed to save cover.');
+    } finally {
+      setSyncing(false);
     }
-    await handleUpdateBinder(selectedBinder.id, {
-      cover_color: coverData.cover_color,
-      cover_text: coverData.cover_text,
-      cover_image_url,
-    });
-    setView('binderView');
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
