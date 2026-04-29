@@ -4,9 +4,15 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import { Book } from 'lucide-react';
 
 export default function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, profile } = useAuth();
 
-  if (loading) {
+  // Optimistic render: if we already have a cached profile (loaded from
+  // sessionStorage on first paint), assume the user is still signed in and
+  // render the app immediately. The auth bootstrap continues in the
+  // background; if the session is truly stale, it will set user=null and the
+  // redirect below will fire on the next render. This eliminates the
+  // full-screen spinner flash on every page refresh.
+  if (loading && !profile) {
     return (
       <div style={{
         minHeight: '100vh',
@@ -31,6 +37,6 @@ export default function ProtectedRoute({ children }) {
     );
   }
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!loading && !user) return <Navigate to="/login" replace />;
   return children;
 }

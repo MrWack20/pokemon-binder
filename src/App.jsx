@@ -41,6 +41,26 @@ import { searchMtgCards, mtgCardToDbRow } from './services/mtgService.js';
 import { searchYgoCards, ygoCardToDbRow } from './services/yugiohService.js';
 import { searchOpCards, opCardToDbRow } from './services/onepieceService.js';
 
+// ─── Dashboard view-state cache ──────────────────────────────────────────────
+// Persists `view`, `selectedBinder` (with cards), and `currentPage` across
+// page refreshes so the user lands back where they were. Stored in
+// sessionStorage so it doesn't leak between tabs / accounts.
+
+const VIEW_CACHE_KEY = 'pkb_dashboard_view';
+
+function getCachedView() {
+  try { return JSON.parse(sessionStorage.getItem(VIEW_CACHE_KEY)); }
+  catch { return null; }
+}
+function cacheView(state) {
+  try { sessionStorage.setItem(VIEW_CACHE_KEY, JSON.stringify(state)); }
+  catch { /* ignore quota / serialization errors */ }
+}
+function clearViewCache() {
+  try { sessionStorage.removeItem(VIEW_CACHE_KEY); }
+  catch { /* ignore */ }
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
@@ -96,11 +116,26 @@ function Dashboard() {
   const navigate = useNavigate();
 
   // ── View state ──────────────────────────────────────────────────────────────
-  const [view, setView] = useState('binders');
+  // Restore view + selectedBinder + currentPage from sessionStorage so a page
+  // refresh doesn't dump the user back to the binders list. 'editBinder' is
+  // transient so we coerce it back to 'binderView' if cached.
+  const cachedView = getCachedView();
+  const restoredView = cachedView?.view === 'editBinder' ? 'binderView' : cachedView?.view;
+
+  const [view, setView] = useState(restoredView || 'binders');
   const [binders, setBinders] = useState(() => getCachedBinders() || []);
-  const [selectedBinder, setSelectedBinder] = useState(null);
-  const [currentPage, setCurrentPage] = useState(0);
+  const [selectedBinder, setSelectedBinder] = useState(cachedView?.selectedBinder ?? null);
+  const [currentPage, setCurrentPage] = useState(cachedView?.currentPage ?? 0);
   const [syncing, setSyncing] = useState(false);
+
+  // Persist view state on every change so we can restore on refresh.
+  useEffect(() => {
+    if (view === 'binders' && !selectedBinder) {
+      clearViewCache();
+    } else {
+      cacheView({ view, selectedBinder, currentPage });
+    }
+  }, [view, selectedBinder, currentPage]);
 
   // ── Search state ─────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -148,6 +183,34 @@ function Dashboard() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
+
+  // After binders load, if we restored a `selectedBinder` from cache, silently
+  // refresh its cards so anything changed in another tab is reflected. If the
+  // binder no longer exists (deleted elsewhere), drop back to the binders view.
+  const didRestoreSelectedRef = React.useRef(false);
+  useEffect(() => {
+    if (didRestoreSelectedRef.current) return;
+    if (!profile?.id || !selectedBinder?.id || binders.length === 0) return;
+    didRestoreSelectedRef.current = true;
+
+    const stillExists = binders.some(b => b.id === selectedBinder.id);
+    if (!stillExists) {
+      setSelectedBinder(null);
+      setView('binders');
+      setCurrentPage(0);
+      return;
+    }
+
+    // Silent background refresh — paint stays, no Syncing pill.
+    (async () => {
+      const { data: cardRows, error } = await getBinderCards(selectedBinder.id);
+      if (error) return;
+      const fresh = binders.find(b => b.id === selectedBinder.id) || selectedBinder;
+      const cards = buildCardsArray(fresh.rows, fresh.cols, fresh.pages, cardRows);
+      setSelectedBinder({ ...fresh, cards });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id, binders.length]);
 
   useEffect(() => {
     const theme = BACKGROUND_THEMES[appSettings.backgroundTheme] || BACKGROUND_THEMES.default;

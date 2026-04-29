@@ -12,6 +12,7 @@ const AuthContext = createContext(null);
 
 const PROFILE_CACHE_KEY = 'pkb_profile_cache';
 const BINDERS_CACHE_KEY = 'pkb_binders_cache';
+const VIEW_CACHE_KEY = 'pkb_dashboard_view';
 
 // ── Session-Storage helpers ─────────────────────────────────────────────────
 
@@ -119,6 +120,7 @@ export function AuthProvider({ children }) {
         if (explicitSignOutRef.current) {
           setUser(null); setProfile(null);
           cacheProfile(null); cacheBinders(null);
+          try { sessionStorage.removeItem(VIEW_CACHE_KEY); } catch { /* ignore */ }
           explicitSignOutRef.current = false;
         }
         // Transient SIGNED_OUT: do nothing. Don't clear state.
@@ -197,6 +199,7 @@ export function AuthProvider({ children }) {
     authSignOut().catch((err) => console.error('signOut (background):', err));
     setUser(null); setProfile(null);
     cacheProfile(null); cacheBinders(null);
+    try { sessionStorage.removeItem(VIEW_CACHE_KEY); } catch { /* ignore */ }
     return { error: null };
   }
 
@@ -214,6 +217,7 @@ export function AuthProvider({ children }) {
         .forEach((k) => localStorage.removeItem(k));
       sessionStorage.removeItem(PROFILE_CACHE_KEY);
       sessionStorage.removeItem(BINDERS_CACHE_KEY);
+      sessionStorage.removeItem(VIEW_CACHE_KEY);
     } catch (err) {
       console.error('forceSignOut cleanup:', err);
     }
