@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { Book, RefreshCw, Layers, BarChart2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import './App.css';
-import { supabase } from './supabase.js';
+import { supabase, envHealth } from './supabase.js';
 import { BACKGROUND_THEMES } from './constants/themes';
 // Heavy pages loaded lazily — reduces initial bundle by ~300KB (Recharts)
 const SettingsPage    = lazy(() => import('./components/SettingsPage'));
@@ -541,9 +541,30 @@ function Dashboard() {
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
+function EnvHealthBanner() {
+  if (envHealth.ok) return null;
+  const missing = [
+    envHealth.urlMissing && 'VITE_SUPABASE_URL',
+    envHealth.keyMissing && 'VITE_SUPABASE_ANON_KEY',
+  ].filter(Boolean).join(', ');
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 10000,
+      background: '#7f1d1d', color: '#fff', padding: '10px 16px',
+      fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.4,
+      borderBottom: '1px solid #ef4444',
+    }}>
+      <strong>Configuration error:</strong> Missing environment variable(s): <code>{missing}</code>.
+      {' '}On Vercel, set these for <strong>both Production and Preview</strong> separately, then redeploy.
+      Auth and database calls will fail until this is fixed.
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <EnvHealthBanner />
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

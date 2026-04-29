@@ -3,11 +3,22 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+export const envHealth = {
+  urlMissing: !supabaseUrl,
+  keyMissing: !supabaseAnonKey,
+  ok: !!supabaseUrl && !!supabaseAnonKey,
+};
+
+if (!envHealth.ok) {
+  const missing = [
+    envHealth.urlMissing && 'VITE_SUPABASE_URL',
+    envHealth.keyMissing && 'VITE_SUPABASE_ANON_KEY',
+  ].filter(Boolean).join(', ');
   console.error(
-    '[PokeBinder] Missing Supabase env vars.\n' +
-    'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file (local) ' +
-    'or in Vercel → Project Settings → Environment Variables (deployed).'
+    `[PokeBinder] Missing Supabase env var(s): ${missing}\n` +
+    'Local: add them to .env in the project root (or current worktree) and restart `npm run dev`.\n' +
+    'Vercel: Project Settings → Environment Variables. NOTE: VITE_SUPABASE_URL must be set for ' +
+    'BOTH Production AND Preview separately. Then redeploy.'
   );
 }
 
