@@ -117,20 +117,33 @@ export function AuthProvider({ children }) {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Visibility change: keep session alive when returning to tab ───────────
-  // This ONLY refreshes the Supabase session (so the next DB call works).
-  // It does NOT touch React state — no re-renders, no race conditions.
+  // ── Visibility / online / periodic session refresh ────────────────────────
+  // Three triggers keep the JWT alive so the next DB call always works:
+  //   1. Tab becomes visible (defeats background-tab setTimeout throttling).
+  //   2. Browser reports we're back online (network reconnected).
+  //   3. Every 4 minutes while user is signed in (catches everything else).
+  //
+  // None of these touch React state — they ONLY refresh the Supabase token,
+  // so there are no re-renders and no races with in-flight DB operations.
+  // See Mistakes Log #18 and #21.
   useEffect(() => {
-    function handleVisibility() {
-      if (document.visibilityState !== 'visible') return;
+    function refreshIfSignedIn() {
       if (!userRef.current) return;
-      // getSession() reads from memory. If the JWT inside is expired,
-      // Supabase internally calls refreshSession() before returning.
-      // We don't care about the result — we just want the token refreshed.
       supabase.auth.getSession().catch(() => {});
     }
+    function handleVisibility() {
+      if (document.visibilityState === 'visible') refreshIfSignedIn();
+    }
     document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('online', refreshIfSignedIn);
+
+    const intervalId = setInterval(refreshIfSignedIn, 4 * 60 * 1000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('online', refreshIfSignedIn);
+      clearInterval(intervalId);
+    };
   }, []);
 
   const refreshProfile = useCallback(async () => {
@@ -143,15 +156,38 @@ export function AuthProvider({ children }) {
 
   async function signOut() {
     explicitSignOutRef.current = true;
-    try { await authSignOut(); } catch (err) { console.error('signOut:', err); }
-    // ALWAYS clear — honour user intent even if Supabase call fails
+    // Fire the network sign-out but do NOT block the UI on it. The local
+    // signOut helper has its own 3s timeout; even so, we clear local state
+    // immediately so the user is never stuck on "Signing out…". The Supabase
+    // request completes (or times out) in the background. See Mistakes Log #22.
+    authSignOut().catch((err) => console.error('signOut (background):', err));
     setUser(null); setProfile(null);
     cacheProfile(null); cacheBinders(null);
     return { error: null };
   }
 
+  /**
+   * Last-resort escape hatch. Wipes all auth-related local/session storage
+   * keys and reloads the page. Used by UserMenu when the normal sign-out
+   * appears stuck (e.g. catastrophic Supabase outage).
+   */
+  function forceSignOut() {
+    try {
+      explicitSignOutRef.current = true;
+      // Remove all Supabase auth tokens (key prefix is `sb-`).
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith('sb-'))
+        .forEach((k) => localStorage.removeItem(k));
+      sessionStorage.removeItem(PROFILE_CACHE_KEY);
+      sessionStorage.removeItem(BINDERS_CACHE_KEY);
+    } catch (err) {
+      console.error('forceSignOut cleanup:', err);
+    }
+    window.location.replace('/login');
+  }
+
   return (
-    <AuthContext.Provider value={{ user, profile, setProfile, loading, signUp, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, setProfile, loading, signUp, signIn, signOut, forceSignOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

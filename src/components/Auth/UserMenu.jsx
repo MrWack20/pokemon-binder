@@ -5,11 +5,12 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 
 export default function UserMenu() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, forceSignOut } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const menuRef = useRef(null);
+  const stuckTimerRef = useRef(null);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -19,15 +20,26 @@ export default function UserMenu() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => () => { if (stuckTimerRef.current) clearTimeout(stuckTimerRef.current); }, []);
+
   async function handleSignOut() {
     setOpen(false);
     setSigningOut(true);
-    const { error } = await signOut();
-    setSigningOut(false);
-    if (error) {
-      toast.error('Sign out failed. Please try again.');
+    // Last-resort safety net: if signOut() hasn't returned in 5s for any
+    // reason (it has its own 3s timeout, this is belt-and-braces), force
+    // the local session clear so the user is never trapped.
+    stuckTimerRef.current = setTimeout(() => {
+      console.warn('[UserMenu] sign-out stuck; forcing local clear');
+      forceSignOut();
+    }, 5000);
+    try {
+      const { error } = await signOut();
+      if (error) toast.error('Sign out had an error, but you are signed out locally.');
+    } finally {
+      clearTimeout(stuckTimerRef.current);
+      stuckTimerRef.current = null;
+      setSigningOut(false);
     }
-    // ProtectedRoute handles redirect to /login when user becomes null
   }
 
   const displayName = profile?.name || user?.email?.split('@')[0] || 'Trainer';

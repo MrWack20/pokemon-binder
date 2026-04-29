@@ -11,6 +11,22 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+// Hard upper-bound on ANY Supabase HTTP request. If the network stalls or the
+// server stops responding, the request is aborted instead of hanging forever
+// (which used to lock up the UI — see Mistakes Log #19, #20, #22).
+const REQUEST_TIMEOUT_MS = 15000;
+
+function timeoutFetch(url, init = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  // Honour any caller-supplied signal too
+  if (init.signal) {
+    init.signal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
+  return fetch(url, { ...init, signal: controller.signal })
+    .finally(() => clearTimeout(timer));
+}
+
 export const supabase = createClient(
   supabaseUrl ?? 'https://placeholder.supabase.co',
   supabaseAnonKey ?? 'placeholder',
@@ -19,6 +35,9 @@ export const supabase = createClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
+    },
+    global: {
+      fetch: timeoutFetch,
     },
   }
 );
@@ -38,4 +57,15 @@ export async function ensureValidSession() {
   } catch {
     return null;
   }
+}
+
+/**
+ * Race any promise against a timeout. Used by services that want a hard
+ * upper bound separate from the underlying fetch timeout.
+ */
+export function withTimeout(promise, ms, label = 'operation') {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timeout`)), ms)),
+  ]);
 }

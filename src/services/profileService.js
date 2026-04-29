@@ -1,6 +1,7 @@
 import { supabase, ensureValidSession } from '../supabase.js';
 
 export async function getProfile(userId) {
+  await ensureValidSession();
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
