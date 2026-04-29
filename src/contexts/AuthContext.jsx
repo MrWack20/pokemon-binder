@@ -40,10 +40,25 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const userRef = useRef(user);
+  const profileRef = useRef(profile);
   const mountedRef = useRef(true);
   const explicitSignOutRef = useRef(false);
 
   useEffect(() => { userRef.current = user; }, [user]);
+  useEffect(() => { profileRef.current = profile; }, [profile]);
+
+  // Shallow-equal check for profile rows. Skipping a setProfile when the
+  // contents are unchanged keeps the object reference stable, which prevents
+  // downstream useEffects (like Dashboard's binder loader) from re-firing on
+  // tab focus / token refresh / view switch.
+  function profilesEqual(a, b) {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    return a.id === b.id
+      && a.user_id === b.user_id
+      && a.name === b.name
+      && a.avatar_url === b.avatar_url;
+  }
 
   // ── ensureProfile ─────────────────────────────────────────────────────────
   const ensureProfile = useCallback(async (authUser) => {
@@ -51,13 +66,19 @@ export function AuthProvider({ children }) {
       const { data: existing, error } = await getProfile(authUser.id);
       if (error && error.code !== 'PGRST116') { console.error('getProfile:', error); return; }
       if (existing) {
-        if (mountedRef.current) { setProfile(existing); cacheProfile(existing); }
+        if (mountedRef.current && !profilesEqual(profileRef.current, existing)) {
+          setProfile(existing);
+          cacheProfile(existing);
+        }
         return;
       }
       const name = authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Trainer';
       const { data: created, error: err2 } = await createProfile(authUser.id, name);
       if (err2) { console.error('createProfile:', err2); return; }
-      if (mountedRef.current) { setProfile(created); cacheProfile(created); }
+      if (mountedRef.current && !profilesEqual(profileRef.current, created)) {
+        setProfile(created);
+        cacheProfile(created);
+      }
     } catch (err) {
       console.error('ensureProfile:', err);
     }
@@ -87,7 +108,10 @@ export function AuthProvider({ children }) {
       const u = session?.user ?? null;
 
       if (event === 'TOKEN_REFRESHED') {
-        if (u) setUser(u);
+        // Only update user state if the id actually changed. Replacing the
+        // user object on every token refresh creates a new reference that
+        // can cascade into expensive re-renders downstream.
+        if (u && userRef.current?.id !== u.id) setUser(u);
         return;
       }
 
@@ -103,10 +127,13 @@ export function AuthProvider({ children }) {
         return;
       }
 
-      // SIGNED_IN
-      setUser(u);
-      if (u) await ensureProfile(u);
-      else { setProfile(null); cacheProfile(null); }
+      // SIGNED_IN — fires on first sign-in AND can re-fire when Supabase
+      // re-establishes a session from storage. Skip the profile re-fetch
+      // when it's the same user we already know about.
+      const sameUser = userRef.current?.id === u?.id;
+      if (!sameUser) setUser(u);
+      if (u && !sameUser) await ensureProfile(u);
+      else if (!u) { setProfile(null); cacheProfile(null); }
     });
 
     return () => {
@@ -123,12 +150,19 @@ export function AuthProvider({ children }) {
   //   2. Browser reports we're back online (network reconnected).
   //   3. Every 4 minutes while user is signed in (catches everything else).
   //
-  // None of these touch React state — they ONLY refresh the Supabase token,
-  // so there are no re-renders and no races with in-flight DB operations.
-  // See Mistakes Log #18 and #21.
+  // Throttled to one refresh per 30s — without this, alt-tabbing rapidly
+  // (OS notifications, dev-tools focus, etc.) fired getSession() over and
+  // over, and each one could trigger a TOKEN_REFRESHED event that cascaded
+  // into re-renders. See Mistakes Log #18 and #21.
   useEffect(() => {
+    let lastRefreshAt = 0;
+    const MIN_INTERVAL_MS = 30_000;
+
     function refreshIfSignedIn() {
       if (!userRef.current) return;
+      const now = Date.now();
+      if (now - lastRefreshAt < MIN_INTERVAL_MS) return;
+      lastRefreshAt = now;
       supabase.auth.getSession().catch(() => {});
     }
     function handleVisibility() {

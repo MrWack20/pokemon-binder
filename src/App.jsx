@@ -128,19 +128,26 @@ function Dashboard() {
     loadAppSettings();
   }, []);
 
-  // Load binders when profile becomes available; retry once if it fails
+  // Load binders when the profile id changes (NOT on every profile object
+  // reference change — auth state churn on tab focus / token refresh creates
+  // new profile object refs even when the user is the same, and we don't want
+  // to re-fetch / show a Syncing pill in that case).
+  //
+  // If we already have cached binders, the first fetch is "silent" — paint
+  // stays, no pill — so the user never sees the app appear to disconnect.
   useEffect(() => {
     if (!profile?.id) return;
     let cancelled = false;
+    const haveCache = binders.length > 0;
     (async () => {
-      const { error } = await loadBinders();
+      const { error } = await loadBinders({ silent: haveCache });
       if (error && !cancelled) {
-        // Retry once after 2s on transient failure
-        setTimeout(() => { if (!cancelled) loadBinders(); }, 2000);
+        setTimeout(() => { if (!cancelled) loadBinders({ silent: haveCache }); }, 2000);
       }
     })();
     return () => { cancelled = true; };
-  }, [profile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id]);
 
   useEffect(() => {
     const theme = BACKGROUND_THEMES[appSettings.backgroundTheme] || BACKGROUND_THEMES.default;
@@ -160,9 +167,9 @@ function Dashboard() {
   };
 
   // ── Data loaders ──────────────────────────────────────────────────────────
-  const loadBinders = async () => {
+  const loadBinders = async ({ silent = false } = {}) => {
     if (!profile?.id) return { error: new Error('No profile') };
-    setSyncing(true);
+    if (!silent) setSyncing(true);
     try {
       const { data, error } = await getBinders(profile.id);
       if (error) { console.error('Error loading binders:', error); return { error }; }
@@ -173,7 +180,7 @@ function Dashboard() {
       console.error('loadBinders exception:', err);
       return { error: err };
     } finally {
-      setSyncing(false);
+      if (!silent) setSyncing(false);
     }
   };
 
