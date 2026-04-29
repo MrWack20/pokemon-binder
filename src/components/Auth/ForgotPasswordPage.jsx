@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Book, Mail, ArrowLeft } from 'lucide-react';
 import { resetPassword } from '../../services/supabaseAuth.js';
+import { runDiagnostics } from '../../supabase.js';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diag, setDiag] = useState(null);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -15,8 +18,19 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     const { error: err } = await resetPassword(email);
     setLoading(false);
-    if (err) setError(err.message);
+    if (err) setError(`${err.message} — open DevTools console for details.`);
     else setSent(true);
+  }
+
+  async function handleDiagnose() {
+    setDiagnosing(true);
+    setDiag(null);
+    try {
+      const report = await runDiagnostics();
+      setDiag(report);
+    } finally {
+      setDiagnosing(false);
+    }
   }
 
   return (
@@ -54,12 +68,40 @@ export default function ForgotPasswordPage() {
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
               <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📬</div>
               <h2 style={{ marginBottom: '12px' }}>Check your inbox</h2>
-              <p style={{ opacity: 0.7, marginBottom: '24px', fontSize: '0.95rem' }}>
-                Sent a reset link to <strong>{email}</strong>.
+              <p style={{ opacity: 0.7, marginBottom: '12px', fontSize: '0.95rem' }}>
+                If <strong>{email}</strong> has an account, a reset link is on its way.
+              </p>
+              <p style={{ opacity: 0.55, marginBottom: '20px', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                Not arriving? Check <strong>spam</strong>, wait a minute, and try again.
+                Free-tier Supabase limits to ~3 reset emails/hour.
               </p>
               <Link to="/login"><button className="btn btn-secondary" style={{ justifyContent: 'center' }}>Back to sign in</button></Link>
             </div>
           )}
+
+          {/* Diagnostics — visible on both states so the user can self-test */}
+          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <button
+              type="button"
+              onClick={handleDiagnose}
+              disabled={diagnosing}
+              className="btn btn-secondary"
+              style={{ width: '100%', justifyContent: 'center', fontSize: '0.85rem', padding: '8px 14px' }}
+            >
+              {diagnosing ? 'Running…' : 'Test Supabase connection'}
+            </button>
+            {diag && (
+              <div style={{ marginTop: '12px', fontSize: '0.78rem', fontFamily: 'monospace', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px 12px', lineHeight: 1.6 }}>
+                <div>env.url: {diag.env.url}</div>
+                <div>env.anonKey: {diag.env.anonKey}</div>
+                <div>auth.getSession: {diag.auth.getSession}</div>
+                <div>db.ping: {diag.db.ping}</div>
+                <div style={{ marginTop: '6px', color: diag.ok ? '#4ade80' : '#f87171' }}>
+                  {diag.ok ? '✓ healthy' : '✗ problems detected — see console'}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {!sent && (

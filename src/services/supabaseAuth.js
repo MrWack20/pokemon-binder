@@ -52,10 +52,24 @@ export function onAuthStateChange(callback) {
 }
 
 export async function resetPassword(email) {
-  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/auth/reset-password`,
-  });
-  return { data, error };
+  const redirectTo = `${window.location.origin}/auth/reset-password`;
+  console.info('[Auth] resetPassword:', email, '->', redirectTo);
+  try {
+    const { data, error } = await withTimeout(
+      supabase.auth.resetPasswordForEmail(email, { redirectTo }),
+      8000,
+      'resetPassword'
+    );
+    if (error) {
+      console.warn('[Auth] resetPassword error:', error.message, '(status', error.status, ')');
+    } else {
+      console.info('[Auth] resetPassword sent (Supabase always returns success for security; check spam, rate limits, and redirect-URL allowlist)');
+    }
+    return { data, error };
+  } catch (err) {
+    console.error('[Auth] resetPassword exception:', err);
+    return { data: null, error: err };
+  }
 }
 
 export async function updateEmail(newEmail) {

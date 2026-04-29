@@ -116,6 +116,16 @@ On Vercel, `VITE_SUPABASE_URL` must be set for **both** Production *and* Preview
 - **Storage bucket:** `binder-covers` (public) — for binder cover image uploads
 - **Auth redirect URLs** must include the Vercel preview URL for email confirmation and password reset to work on deployed builds.
 
+### Common Supabase auth gotchas (READ before debugging auth bugs)
+
+When users report "auth doesn't work" / "forgot password email never arrives" / "queries return nothing":
+
+1. **Free-tier project auto-pause** — Supabase pauses free-tier projects after 7 days of inactivity. ALL queries hang or timeout until you click "Restore project" in the dashboard. Symptom: every fetch hits the 15s timeout.
+2. **Email rate limit** — Free tier sends ~3 reset/confirmation emails per hour per project (and ~4 per email address per hour). Excess attempts return success (Supabase doesn't reveal rate-limit hits to prevent enumeration) but no email arrives. Symptom: "Check your inbox" shows but no email.
+3. **`redirectTo` URL not in allowlist** — Supabase Dashboard → Auth → URL Configuration → "Redirect URLs" must include EVERY `window.location.origin` you serve from: `http://localhost:5173`, `http://localhost:5173/auth/reset-password`, `http://localhost:5173/auth/callback`, the production Vercel URL, AND every preview URL pattern (`https://pokemon-binder-git-<branch>-*.vercel.app/**`). Wildcard patterns are supported (`*.vercel.app/**`).
+4. **Custom SMTP not configured** — Default Supabase SMTP is shared and aggressively rate-limited. For real production use, configure your own SMTP (SendGrid, Resend, etc.) under Auth → SMTP Settings.
+5. **Browser-side diagnostics** — Run `window.__pkbDiagnostics()` in DevTools console (or click the "Test Supabase connection" button on the Forgot Password page) for a one-shot health check. Enable verbose request logging with `localStorage.setItem('pkb_debug', '1')`.
+
 ---
 
 ## Database Schema
