@@ -5,7 +5,7 @@ import {
   signOut as authSignOut,
   onAuthStateChange,
 } from '../services/supabaseAuth.js';
-import { supabase } from '../supabase.js';
+import { supabase, ensureValidSession } from '../supabase.js';
 import { queryClient } from '../queryClient.js';
 import { getProfile, createProfile } from '../services/profileService.js';
 
@@ -100,7 +100,11 @@ export function AuthProvider({ children }) {
       if (!cancelled && mountedRef.current) setLoading(false);
     }, 6000);
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    // ensureValidSession() refreshes the JWT if it's near/past expiry, so
+    // the very first DB call below uses a fresh token. Without this, an
+    // expired-but-not-yet-refreshed token causes RLS to silently return []
+    // and the user sees an empty dashboard. See Mistakes Log #17.
+    ensureValidSession().then(async (session) => {
       if (cancelled) return;
       clearTimeout(fallback);
       const u = session?.user ?? null;

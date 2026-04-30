@@ -158,20 +158,45 @@ export const supabase = createClient(
 _supabase = supabase;
 
 /**
- * Ensure we have a valid session. Calls getSession() which triggers an
- * internal refresh if the JWT is expired. Has a 5-second timeout so it
- * can never hang the UI.
+ * Ensure we have a valid session BEFORE making a DB call.
+ *
+ * Why this matters: when the access_token has expired, PostgREST + RLS
+ * silently returns 200 with an empty array (auth.uid() is NULL → nothing
+ * matches the user's RLS policies). The 401-retry interceptor can't help
+ * because there's no 401 to react to. So we proactively refresh whenever
+ * the token is within 60s of expiry. See Mistakes Log #17.
+ *
+ * Single-flight: concurrent callers share the same in-flight refresh.
+ * Hard 5s timeout on each step so we can never hang the UI.
  */
+const EXPIRY_BUFFER_SECONDS = 60;
+let _validateInFlight = null;
+
 export async function ensureValidSession() {
-  try {
-    const result = await Promise.race([
-      supabase.auth.getSession(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Session check timeout')), 5000)),
-    ]);
-    return result.data?.session ?? null;
-  } catch {
-    return null;
-  }
+  if (_validateInFlight) return _validateInFlight;
+  _validateInFlight = (async () => {
+    try {
+      const { data: { session } } = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('getSession timeout')), 5000)),
+      ]);
+      if (!session) return null;
+
+      const now = Math.floor(Date.now() / 1000);
+      const expiresAt = session.expires_at ?? 0;
+      if (expiresAt - now > EXPIRY_BUFFER_SECONDS) return session;
+
+      // Token is expired or about to expire — refresh now (deduped via
+      // refreshOnce() so we share with any 401-driven refresh in flight).
+      const fresh = await refreshOnce();
+      return fresh ?? session;
+    } catch {
+      return null;
+    } finally {
+      _validateInFlight = null;
+    }
+  })();
+  return _validateInFlight;
 }
 
 /**
