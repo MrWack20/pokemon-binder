@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { ArrowLeft, TrendingUp, Package, DollarSign, BookOpen, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import { getCollectionStats } from '../services/statsService.js';
+import { useCollectionStats } from '../hooks/queries.js';
 
 const CHART_COLORS = ['#fbbf24', '#3b82f6', '#10b981', '#f87171', '#a78bfa', '#34d399', '#fb923c', '#60a5fa'];
 
@@ -53,23 +53,11 @@ function StatCard({ icon: Icon, label, value, sub, color }) {
 export default function StatsPage() {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { data: stats, isLoading: loading, error } = useCollectionStats(profile?.id);
 
   const savedSettings = (() => { try { return JSON.parse(localStorage.getItem('pokemonBinderSettings') || '{}'); } catch { return {}; } })();
   const currency = savedSettings.currency || 'USD';
   const symbol = CURRENCY_SYMBOL[currency] || '$';
-
-  useEffect(() => {
-    if (!profile?.id) return;
-    setLoading(true);
-    getCollectionStats(profile.id).then(({ data, error }) => {
-      setLoading(false);
-      if (error) setError('Failed to load statistics.');
-      else setStats(data);
-    });
-  }, [profile?.id]);
 
   return (
     <div className="app">
@@ -94,7 +82,7 @@ export default function StatsPage() {
 
           {error && (
             <div className="card" style={{ textAlign: 'center', padding: '40px', color: '#f87171' }}>
-              {error}
+              Failed to load statistics.
             </div>
           )}
 

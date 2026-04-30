@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { X, Save, User, Lock, Mail, Palette } from 'lucide-react';
 import { BACKGROUND_THEMES } from '../constants/themes';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import { updateProfile } from '../services/profileService.js';
+import { useUpdateProfile } from '../hooks/queries.js';
 import { updateEmail, updatePassword } from '../services/supabaseAuth.js';
 
 export default function SettingsPanel({ settings, onSave, onClose }) {
   const { user, profile, setProfile } = useAuth();
+  const updateProfileMut = useUpdateProfile();
   const [localSettings, setLocalSettings] = useState(settings);
 
   // Account fields
@@ -27,14 +28,19 @@ export default function SettingsPanel({ settings, onSave, onClose }) {
     if (!displayName.trim()) return;
     setSaving(true);
     setNameMsg(null);
-    const { data, error } = await updateProfile(profile.id, { name: displayName.trim() });
-    if (error) {
-      setNameMsg({ type: 'error', text: error.message });
-    } else {
+    try {
+      const data = await updateProfileMut.mutateAsync({
+        profileId: profile.id,
+        userId: user?.id,
+        updates: { name: displayName.trim() },
+      });
       setProfile(data);
       setNameMsg({ type: 'success', text: 'Display name updated.' });
+    } catch (err) {
+      setNameMsg({ type: 'error', text: err?.message || 'Failed to update name.' });
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   async function handleSaveEmail() {

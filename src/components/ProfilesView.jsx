@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Edit2, Save, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import { updateProfile } from '../services/profileService.js';
+import { useUpdateProfile } from '../hooks/queries.js';
 
 /**
  * ProfilesView — shows the current user's profile and allows renaming it.
@@ -9,17 +9,23 @@ import { updateProfile } from '../services/profileService.js';
  */
 export default function ProfilesView() {
   const { profile, setProfile, user } = useAuth();
+  const updateProfileMut = useUpdateProfile();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(profile?.name ?? '');
-  const [saving, setSaving] = useState(false);
+  const saving = updateProfileMut.isPending;
 
   const handleSave = async () => {
     if (!name.trim() || !profile) return;
-    setSaving(true);
-    const { data } = await updateProfile(profile.id, { name: name.trim() });
-    if (data) setProfile(data);
-    setSaving(false);
-    setEditing(false);
+    try {
+      const data = await updateProfileMut.mutateAsync({
+        profileId: profile.id,
+        userId: user?.id,
+        updates: { name: name.trim() },
+      });
+      if (data) setProfile(data);
+    } finally {
+      setEditing(false);
+    }
   };
 
   if (!profile) return null;

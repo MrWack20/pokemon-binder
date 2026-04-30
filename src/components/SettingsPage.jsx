@@ -4,7 +4,7 @@ import { Save, User, Lock, Mail, Palette, ArrowLeft, LogOut, DollarSign } from '
 import toast from 'react-hot-toast';
 import { BACKGROUND_THEMES } from '../constants/themes';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import { updateProfile } from '../services/profileService.js';
+import { useUpdateProfile } from '../hooks/queries.js';
 import { updateEmail, updatePassword } from '../services/supabaseAuth.js';
 
 const SETTINGS_KEY = 'pokemonBinderSettings';
@@ -21,6 +21,7 @@ function loadSettings() {
 export default function SettingsPage() {
   const { user, profile, setProfile, signOut } = useAuth();
   const navigate = useNavigate();
+  const updateProfileMut = useUpdateProfile();
 
   const [selectedTheme, setSelectedTheme] = useState(() => loadSettings().backgroundTheme);
   const [currency, setCurrency] = useState(() => loadSettings().currency || 'USD');
@@ -29,9 +30,9 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const [savingName, setSavingName] = useState(false);
   const [savingEmail, setSavingEmail] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const savingName = updateProfileMut.isPending;
 
   const isOAuth = user?.app_metadata?.provider !== 'email';
 
@@ -56,11 +57,17 @@ export default function SettingsPage() {
 
   async function handleSaveName() {
     if (!displayName.trim()) return;
-    setSavingName(true);
-    const { data, error } = await updateProfile(profile.id, { name: displayName.trim() });
-    setSavingName(false);
-    if (error) toast.error(error.message || 'Failed to update name.');
-    else { setProfile(data); toast.success('Display name updated.'); }
+    try {
+      const data = await updateProfileMut.mutateAsync({
+        profileId: profile.id,
+        userId: user?.id,
+        updates: { name: displayName.trim() },
+      });
+      setProfile(data);
+      toast.success('Display name updated.');
+    } catch (err) {
+      toast.error(err?.message || 'Failed to update name.');
+    }
   }
 
   async function handleSaveEmail() {

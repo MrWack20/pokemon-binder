@@ -1,9 +1,12 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
+import { QueryClientProvider, useIsMutating } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Book, RefreshCw, Layers, BarChart2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import './App.css';
 import { supabase, envHealth } from './supabase.js';
+import { queryClient } from './queryClient.js';
 import { BACKGROUND_THEMES } from './constants/themes';
 // Heavy pages loaded lazily — reduces initial bundle by ~300KB (Recharts)
 const SettingsPage    = lazy(() => import('./components/SettingsPage'));
@@ -14,7 +17,7 @@ import CardInspectModal from './components/CardInspectModal';
 import BindersView from './components/BindersView';
 import EditBinderCover from './components/EditBinderCover';
 import BinderView from './components/BinderView';
-import { AuthProvider, useAuth, getCachedBinders, cacheBinders } from './contexts/AuthContext.jsx';
+import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import ProtectedRoute from './components/Auth/ProtectedRoute.jsx';
 import LoginPage from './components/Auth/LoginPage.jsx';
 import RegisterPage from './components/Auth/RegisterPage.jsx';
@@ -23,53 +26,21 @@ import AuthCallbackPage from './components/Auth/AuthCallbackPage.jsx';
 import ResetPasswordPage from './components/Auth/ResetPasswordPage.jsx';
 import UserMenu from './components/Auth/UserMenu.jsx';
 import {
-  getBinders,
-  createBinder as createBinderSvc,
-  updateBinder as updateBinderSvc,
-  deleteBinder as deleteBinderSvc,
-  duplicateBinder as duplicateBinderSvc,
-} from './services/binderService.js';
-import {
-  getBinderCards,
-  addCard,
-  removeCard,
-  moveCard,
-  swapCards as swapCardsSvc,
-} from './services/cardService.js';
+  useBinders,
+  useBinderCards,
+  useCreateBinder,
+  useUpdateBinder,
+  useDeleteBinder,
+  useDuplicateBinder,
+  useAddCard,
+  useRemoveCard,
+  useMoveCard,
+  useSwapCards,
+} from './hooks/queries.js';
 import { searchCards as searchCardsSvc, getSets, addRecentSearch } from './services/searchService.js';
-import { searchMtgCards, mtgCardToDbRow } from './services/mtgService.js';
-import { searchYgoCards, ygoCardToDbRow } from './services/yugiohService.js';
-import { searchOpCards, opCardToDbRow } from './services/onepieceService.js';
-
-// ─── Per-binder cards cache ──────────────────────────────────────────────────
-// Stores the most recent `binder_cards` rows per binder id in sessionStorage.
-// Lets BinderView paint instantly on a hard refresh while a fresh fetch runs
-// in the background. URL is the source of truth for which binder/page is open
-// — see Dashboard() below.
-
-const CARDS_CACHE_KEY = 'pkb_cards_cache';
-
-function getCardsCacheMap() {
-  try { return JSON.parse(sessionStorage.getItem(CARDS_CACHE_KEY)) || {}; }
-  catch { return {}; }
-}
-function getCachedCards(binderId) {
-  return getCardsCacheMap()[binderId] || null;
-}
-function cacheCards(binderId, rows) {
-  try {
-    const map = getCardsCacheMap();
-    map[binderId] = rows || [];
-    sessionStorage.setItem(CARDS_CACHE_KEY, JSON.stringify(map));
-  } catch { /* ignore quota / serialization errors */ }
-}
-function evictCachedCards(binderId) {
-  try {
-    const map = getCardsCacheMap();
-    delete map[binderId];
-    sessionStorage.setItem(CARDS_CACHE_KEY, JSON.stringify(map));
-  } catch { /* ignore */ }
-}
+import { mtgCardToDbRow, searchMtgCards } from './services/mtgService.js';
+import { ygoCardToDbRow, searchYgoCards } from './services/yugiohService.js';
+import { opCardToDbRow, searchOpCards } from './services/onepieceService.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -142,9 +113,49 @@ function Dashboard() {
     setSearchParams(value > 0 ? { page: String(value) } : {}, { replace: true });
   };
 
-  const [binders, setBinders] = useState(() => getCachedBinders() || []);
-  const [selectedBinder, setSelectedBinder] = useState(null);
-  const [syncing, setSyncing] = useState(false);
+  // ── Server state via React Query ─────────────────────────────────────────
+  // `binders` and `cardRows` come straight from the cache — no local mirror,
+  // no manual loadBinders, no setSyncing flag-juggling. Refetch-on-focus and
+  // refetch-on-reconnect are handled by queryClient defaults.
+  const { data: binders = [], isFetched: bindersFetched } = useBinders(profile?.id);
+  const { data: cardRows = [] } = useBinderCards(binderId);
+
+  // Mutation hooks — each one owns its own optimistic update + rollback.
+  const createBinderMut = useCreateBinder();
+  const updateBinderMut = useUpdateBinder();
+  const deleteBinderMut = useDeleteBinder();
+  const duplicateBinderMut = useDuplicateBinder();
+  const addCardMut = useAddCard();
+  const removeCardMut = useRemoveCard();
+  const moveCardMut = useMoveCard();
+  const swapCardsMut = useSwapCards();
+
+  // The Syncing pill now reflects ONLY in-flight writes — background refetches
+  // happen invisibly. (Showing the pill on every focus-refetch was the
+  // original "tab switch shows Syncing" complaint.)
+  const syncing = useIsMutating() > 0;
+
+  // Derive `selectedBinder` from the URL + query caches. This is the same
+  // shape BinderView consumed before (binder meta + a slot-indexed cards
+  // array), so no changes are needed downstream.
+  const selectedBinder = useMemo(() => {
+    if (!binderId) return null;
+    const meta = binders.find(b => b.id === binderId);
+    if (!meta) return null;
+    return {
+      ...meta,
+      cards: buildCardsArray(meta.rows, meta.cols, meta.pages, cardRows),
+    };
+  }, [binderId, binders, cardRows]);
+
+  // If the URL points at a binder that doesn't exist (deleted in another tab,
+  // bad share link, etc.), bounce home. Only fires once binders have loaded.
+  useEffect(() => {
+    if (!binderId || !bindersFetched) return;
+    if (binders.some(b => b.id === binderId)) return;
+    toast.error('Binder not found.');
+    navigate('/', { replace: true });
+  }, [binderId, bindersFetched, binders, navigate]);
 
   // ── Search state ─────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -166,80 +177,11 @@ function Dashboard() {
   // ── Settings state ───────────────────────────────────────────────────────
   const [appSettings, setAppSettings] = useState({ backgroundTheme: 'default' });
 
-  // ── Bootstrap ────────────────────────────────────────────────────────────
+  // ── Bootstrap (theme + sets list only — server data is via React Query) ──
   useEffect(() => {
     loadSetsData();
     loadAppSettings();
   }, []);
-
-  // Load binders when the profile id changes (NOT on every profile object
-  // reference change — auth state churn on tab focus / token refresh creates
-  // new profile object refs even when the user is the same, and we don't want
-  // to re-fetch / show a Syncing pill in that case).
-  //
-  // If we already have cached binders, the first fetch is "silent" — paint
-  // stays, no pill — so the user never sees the app appear to disconnect.
-  useEffect(() => {
-    if (!profile?.id) return;
-    let cancelled = false;
-    const haveCache = binders.length > 0;
-    (async () => {
-      const { error } = await loadBinders({ silent: haveCache });
-      if (error && !cancelled) {
-        setTimeout(() => { if (!cancelled) loadBinders({ silent: haveCache }); }, 2000);
-      }
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id]);
-
-  // ── Sync `selectedBinder` to the URL ──────────────────────────────────────
-  // Whenever `binderId` (from the URL) changes, find that binder in our list,
-  // optimistically paint from the per-binder cards cache, then refresh in the
-  // background. If the binder isn't found once binders have loaded, send the
-  // user back to the dashboard.
-  useEffect(() => {
-    if (!binderId) {
-      setSelectedBinder(null);
-      return;
-    }
-    if (binders.length === 0) return; // wait for binders to load
-
-    const meta = binders.find(b => b.id === binderId);
-    if (!meta) {
-      toast.error('Binder not found.');
-      navigate('/', { replace: true });
-      return;
-    }
-
-    // Optimistic paint — only swap in cached/empty cards if we don't already
-    // have the right binder loaded (avoids clobbering local edits).
-    if (!selectedBinder || selectedBinder.id !== binderId) {
-      const cachedRows = getCachedCards(binderId);
-      const cards = cachedRows
-        ? buildCardsArray(meta.rows, meta.cols, meta.pages, cachedRows)
-        : Array(meta.rows * meta.cols * meta.pages).fill(null);
-      setSelectedBinder({ ...meta, cards });
-    }
-
-    // Background refresh
-    let cancelled = false;
-    (async () => {
-      const { data: cardRows, error } = await getBinderCards(binderId);
-      if (cancelled || error) return;
-      cacheCards(binderId, cardRows || []);
-      setSelectedBinder(prev => {
-        if (!prev || prev.id !== binderId) return prev;
-        const fresh = binders.find(b => b.id === binderId) || meta;
-        return {
-          ...fresh,
-          cards: buildCardsArray(fresh.rows, fresh.cols, fresh.pages, cardRows),
-        };
-      });
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [binderId, binders]);
 
   useEffect(() => {
     const theme = BACKGROUND_THEMES[appSettings.backgroundTheme] || BACKGROUND_THEMES.default;
@@ -247,42 +189,10 @@ function Dashboard() {
     document.body.style.minHeight = '100vh';
   }, [appSettings.backgroundTheme]);
 
-  // Keep the per-binder cards cache in sync with local card-array mutations
-  // (add / remove / swap). Skips the empty placeholder shape so we don't
-  // overwrite real cached rows with all-null arrays during optimistic paint.
-  useEffect(() => {
-    if (!selectedBinder?.id) return;
-    const rows = (selectedBinder.cards || []).filter(c => c && c.id);
-    if (rows.length > 0) cacheCards(selectedBinder.id, rows);
-  }, [selectedBinder]);
-
   // ── Settings helpers ──────────────────────────────────────────────────────
   const loadAppSettings = () => {
     const saved = localStorage.getItem('pokemonBinderSettings');
     if (saved) setAppSettings(JSON.parse(saved));
-  };
-
-  const saveAppSettings = (newSettings) => {
-    setAppSettings(newSettings);
-    localStorage.setItem('pokemonBinderSettings', JSON.stringify(newSettings));
-  };
-
-  // ── Data loaders ──────────────────────────────────────────────────────────
-  const loadBinders = async ({ silent = false } = {}) => {
-    if (!profile?.id) return { error: new Error('No profile') };
-    if (!silent) setSyncing(true);
-    try {
-      const { data, error } = await getBinders(profile.id);
-      if (error) { console.error('Error loading binders:', error); return { error }; }
-      setBinders(data || []);
-      cacheBinders(data || []);
-      return { error: null };
-    } catch (err) {
-      console.error('loadBinders exception:', err);
-      return { error: err };
-    } finally {
-      if (!silent) setSyncing(false);
-    }
   };
 
   const loadSetsData = async () => {
@@ -321,144 +231,100 @@ function Dashboard() {
     setLoading(false);
   };
 
-  // ── Binder CRUD ───────────────────────────────────────────────────────────
+  // ── Binder CRUD (mutations own the cache; we just call them) ──────────────
   const handleCreateBinder = async (binderData) => {
-    setSyncing(true);
     try {
-      const { data, error } = await createBinderSvc(profile.id, {
-        name: binderData.name,
-        rows: binderData.rows,
-        cols: binderData.cols,
-        pages: binderData.pages,
-        cover_color: binderData.coverColor,
-        cover_text: binderData.coverText || null,
+      const data = await createBinderMut.mutateAsync({
+        profileId: profile.id,
+        fields: {
+          name: binderData.name,
+          rows: binderData.rows,
+          cols: binderData.cols,
+          pages: binderData.pages,
+          cover_color: binderData.coverColor,
+          cover_text: binderData.coverText || null,
+        },
       });
-      if (error || !data) { toast.error('Failed to create binder.'); return; }
       if (binderData.coverImageFile) {
         const url = await uploadBinderCover(data.id, binderData.coverImageFile);
-        if (url) { await updateBinderSvc(data.id, { cover_image_url: url }); data.cover_image_url = url; }
+        if (url) {
+          await updateBinderMut.mutateAsync({
+            binderId: data.id,
+            profileId: profile.id,
+            updates: { cover_image_url: url },
+          });
+        }
       }
-      setBinders(prev => {
-        const next = [...prev, { ...data, cards: Array(data.rows * data.cols * data.pages).fill(null) }];
-        cacheBinders(next);
-        return next;
-      });
       toast.success(`Binder "${data.name}" created!`);
     } catch (err) {
       console.error('handleCreateBinder:', err);
       toast.error('Failed to create binder.');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const handleUpdateBinder = async (binderId, updates) => {
-    setSyncing(true);
-    try {
-      const { data, error } = await updateBinderSvc(binderId, updates);
-      if (error) { toast.error('Failed to update binder.'); return; }
-      setBinders(prev => prev.map(b => b.id === binderId ? { ...b, ...data } : b));
-      if (selectedBinder?.id === binderId) setSelectedBinder(prev => ({ ...prev, ...data }));
-    } catch (err) {
-      console.error('handleUpdateBinder:', err);
-      toast.error('Failed to update binder.');
-    } finally {
-      setSyncing(false);
     }
   };
 
   const handleDeleteBinder = async (deletedId) => {
-    setSyncing(true);
     try {
-      const { error } = await deleteBinderSvc(deletedId);
-      if (error) { toast.error('Failed to delete binder.'); return; }
-      setBinders(prev => {
-        const next = prev.filter(b => b.id !== deletedId);
-        cacheBinders(next);
-        return next;
-      });
-      evictCachedCards(deletedId);
+      await deleteBinderMut.mutateAsync({ binderId: deletedId, profileId: profile.id });
       toast.success('Binder deleted.');
     } catch (err) {
       console.error('handleDeleteBinder:', err);
       toast.error('Failed to delete binder.');
-    } finally {
-      setSyncing(false);
     }
   };
 
-  const handleDuplicateBinder = async (binderId, binderName) => {
-    setSyncing(true);
+  const handleDuplicateBinder = async (id, binderName) => {
     try {
-      const { data, error } = await duplicateBinderSvc(binderId);
-      if (error || !data) { toast.error('Failed to duplicate binder.'); return; }
-      setBinders(prev => {
-        const next = [...prev, { ...data, binder_cards: [{ count: 0 }] }];
-        cacheBinders(next);
-        return next;
-      });
+      await duplicateBinderMut.mutateAsync({ binderId: id, profileId: profile.id });
       toast.success(`"${binderName}" duplicated.`);
     } catch (err) {
       console.error('handleDuplicateBinder:', err);
       toast.error('Failed to duplicate binder.');
-    } finally {
-      setSyncing(false);
     }
   };
 
   // ── Open binder ────────────────────────────────────────────────────────────
-  // Just navigate — the URL-sync effect handles cache paint + background fetch.
-  const handleSelectBinder = (binder) => {
-    navigate(`/binder/${binder.id}`);
-  };
+  const handleSelectBinder = (binder) => navigate(`/binder/${binder.id}`);
 
   // ── Card CRUD ─────────────────────────────────────────────────────────────
 
   /**
    * Add a TCG API card object to the selected slot.
-   * Maps API fields → binder_cards DB columns.
+   * Maps API fields → binder_cards DB columns. The mutation handles the
+   * optimistic cache update + rollback on failure.
    */
   const handleAddCard = async (apiCard) => {
-    if (selectedCell === null || !selectedBinder) {
-      console.warn('handleAddCard: selectedCell=', selectedCell, 'selectedBinder=', selectedBinder);
-      return;
+    if (selectedCell === null || !selectedBinder) return;
+    const game = apiCard._game ?? 'pokemon';
+    let dbRow;
+    if (game === 'mtg') {
+      dbRow = mtgCardToDbRow(apiCard);
+    } else if (game === 'yugioh') {
+      dbRow = ygoCardToDbRow(apiCard);
+    } else if (game === 'onepiece') {
+      dbRow = opCardToDbRow(apiCard);
+    } else {
+      dbRow = {
+        card_api_id: apiCard.id,
+        card_name: apiCard.name,
+        card_image_url: apiCard.images?.small ?? apiCard.images?.large ?? '',
+        card_set: apiCard.set?.name ?? null,
+        card_game: 'pokemon',
+        card_price: apiCard._price
+          ?? apiCard.tcgplayer?.prices?.holofoil?.market
+          ?? apiCard.tcgplayer?.prices?.normal?.market
+          ?? apiCard.tcgplayer?.prices?.['1stEditionHolofoil']?.market
+          ?? apiCard.tcgplayer?.prices?.unlimited?.market
+          ?? null,
+        card_price_currency: 'USD',
+      };
     }
-    setSyncing(true);
-    try {
-      const game = apiCard._game ?? 'pokemon';
-      let dbRow;
-      if (game === 'mtg') {
-        dbRow = mtgCardToDbRow(apiCard);
-      } else if (game === 'yugioh') {
-        dbRow = ygoCardToDbRow(apiCard);
-      } else if (game === 'onepiece') {
-        dbRow = opCardToDbRow(apiCard);
-      } else {
-        dbRow = {
-          card_api_id: apiCard.id,
-          card_name: apiCard.name,
-          card_image_url: apiCard.images?.small ?? apiCard.images?.large ?? '',
-          card_set: apiCard.set?.name ?? null,
-          card_game: 'pokemon',
-          card_price: apiCard._price
-            ?? apiCard.tcgplayer?.prices?.holofoil?.market
-            ?? apiCard.tcgplayer?.prices?.normal?.market
-            ?? apiCard.tcgplayer?.prices?.['1stEditionHolofoil']?.market
-            ?? apiCard.tcgplayer?.prices?.unlimited?.market
-            ?? null,
-          card_price_currency: 'USD',
-        };
-      }
-      const { data, error } = await addCard(selectedBinder.id, selectedCell, dbRow);
-      if (error || !data) {
-        console.error('addCard error:', error);
-        toast.error(`Failed to add card: ${error?.message ?? 'unknown error'}`);
-        return;
-      }
 
-      const updatedCards = [...selectedBinder.cards];
-      updatedCards[selectedCell] = data;
-      setSelectedBinder({ ...selectedBinder, cards: updatedCards });
+    try {
+      const data = await addCardMut.mutateAsync({
+        binderId: selectedBinder.id,
+        slotIndex: selectedCell,
+        dbRow,
+      });
       setSelectedCell(null);
       setSearchResults([]);
       setSearchQuery('');
@@ -468,82 +334,70 @@ function Dashboard() {
       toast.success(`${data.card_name} added!`);
     } catch (err) {
       console.error('handleAddCard:', err);
-      toast.error('Failed to add card.');
-    } finally {
-      setSyncing(false);
+      toast.error(`Failed to add card: ${err?.message ?? 'unknown error'}`);
     }
   };
 
-  /** Remove a card by its slot index. Uses the DB row id stored in the slot. */
   const handleRemoveCard = async (slotIndex) => {
     if (!selectedBinder) return;
     const card = selectedBinder.cards[slotIndex];
-    if (!card) return;
-    setSyncing(true);
+    // Skip optimistic temp rows — they don't exist in the DB yet.
+    if (!card?.id || String(card.id).startsWith('temp-')) return;
     try {
-      const { error } = await removeCard(card.id);
-      if (error) { toast.error('Failed to remove card.'); return; }
-      const updatedCards = [...selectedBinder.cards];
-      updatedCards[slotIndex] = null;
-      setSelectedBinder({ ...selectedBinder, cards: updatedCards });
+      await removeCardMut.mutateAsync({ binderId: selectedBinder.id, cardId: card.id });
     } catch (err) {
       console.error('handleRemoveCard:', err);
       toast.error('Failed to remove card.');
-    } finally {
-      setSyncing(false);
     }
   };
 
-  /**
-   * Swap or move cards using slot indices (as BinderView expects).
-   * Looks up the DB row id from the local slot array before calling the service.
-   */
   const handleSwapCards = async (fromIndex, toIndex) => {
     if (!selectedBinder || fromIndex === toIndex) return;
     const fromCard = selectedBinder.cards[fromIndex];
     const toCard = selectedBinder.cards[toIndex];
-    if (!fromCard) return;
+    if (!fromCard?.id || String(fromCard.id).startsWith('temp-')) return;
 
-    setSyncing(true);
     try {
-      const { error } = fromCard && toCard
-        ? await swapCardsSvc(fromCard.id, toCard.id)
-        : await moveCard(fromCard.id, toIndex);
-
-      if (error) { toast.error('Failed to move card.'); return; }
-
-      const updatedCards = [...selectedBinder.cards];
-      updatedCards[fromIndex] = toCard ? { ...toCard, slot_index: fromIndex } : null;
-      updatedCards[toIndex] = { ...fromCard, slot_index: toIndex };
-      setSelectedBinder({ ...selectedBinder, cards: updatedCards });
+      if (toCard?.id && !String(toCard.id).startsWith('temp-')) {
+        await swapCardsMut.mutateAsync({
+          binderId: selectedBinder.id,
+          cardId1: fromCard.id,
+          cardId2: toCard.id,
+        });
+      } else {
+        await moveCardMut.mutateAsync({
+          binderId: selectedBinder.id,
+          cardId: fromCard.id,
+          newSlotIndex: toIndex,
+        });
+      }
     } catch (err) {
       console.error('handleSwapCards:', err);
       toast.error('Failed to move card.');
-    } finally {
-      setSyncing(false);
     }
   };
 
   // ── Cover edit save ───────────────────────────────────────────────────────
   const handleEditBinderSave = async (coverData, imageFile) => {
-    setSyncing(true);
     try {
       let cover_image_url = coverData.cover_image_url;
       if (imageFile) {
         const url = await uploadBinderCover(selectedBinder.id, imageFile);
         if (url) cover_image_url = url;
       }
-      await handleUpdateBinder(selectedBinder.id, {
-        cover_color: coverData.cover_color,
-        cover_text: coverData.cover_text,
-        cover_image_url,
+      await updateBinderMut.mutateAsync({
+        binderId: selectedBinder.id,
+        profileId: profile.id,
+        updates: {
+          cover_color: coverData.cover_color,
+          cover_text: coverData.cover_text,
+          cover_image_url,
+        },
       });
       navigate(`/binder/${selectedBinder.id}`);
     } catch (err) {
       console.error('handleEditBinderSave:', err);
       toast.error('Failed to save cover.');
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -600,10 +454,7 @@ function Dashboard() {
             binder={selectedBinder}
             currentPage={currentPage}
             onPageChange={setCurrentPage}
-            onBack={() => {
-              navigate('/');
-              loadBinders({ silent: true });
-            }}
+            onBack={() => navigate('/')}
             onEditCover={() => navigate(`/binder/${selectedBinder.id}/edit`)}
             selectedCell={selectedCell}
             onSelectCell={setSelectedCell}
@@ -690,24 +541,27 @@ function EnvHealthBanner() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <EnvHealthBanner />
-      <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/auth/callback" element={<AuthCallbackPage />} />
-          <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/binder/:binderId" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/binder/:binderId/edit" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><Suspense fallback={<PageLoader />}><SettingsPage /></Suspense></ProtectedRoute>} />
-          <Route path="/stats"    element={<ProtectedRoute><Suspense fallback={<PageLoader />}><StatsPage /></Suspense></ProtectedRoute>} />
-          <Route path="/sets"     element={<ProtectedRoute><Suspense fallback={<PageLoader />}><SetsPage /></Suspense></ProtectedRoute>} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <EnvHealthBanner />
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
+            <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/binder/:binderId" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/binder/:binderId/edit" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Suspense fallback={<PageLoader />}><SettingsPage /></Suspense></ProtectedRoute>} />
+            <Route path="/stats"    element={<ProtectedRoute><Suspense fallback={<PageLoader />}><StatsPage /></Suspense></ProtectedRoute>} />
+            <Route path="/sets"     element={<ProtectedRoute><Suspense fallback={<PageLoader />}><SetsPage /></Suspense></ProtectedRoute>} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
+      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />}
+    </QueryClientProvider>
   );
 }

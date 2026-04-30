@@ -96,6 +96,51 @@ function requestUrl(input) {
   return '<unknown>';
 }
 
+// Forward-reference to the supabase client so the 401 retry wrapper can call
+// `auth.refreshSession()`. The wrapper only runs when an actual HTTP request
+// fires (well after `_supabase` has been assigned below), so this is safe.
+let _supabase;
+
+// Single-flight token refresh — if N concurrent requests all 401, only ONE
+// refreshSession() call goes out and they all await the same promise.
+let _refreshPromise = null;
+function refreshOnce() {
+  if (!_supabase) return Promise.resolve(null);
+  if (_refreshPromise) return _refreshPromise;
+  _refreshPromise = _supabase.auth
+    .refreshSession()
+    .then(({ data, error }) => (error ? null : data?.session ?? null))
+    .catch(() => null)
+    .finally(() => { _refreshPromise = null; });
+  return _refreshPromise;
+}
+
+/**
+ * Wraps timeoutFetch with one-shot 401 retry: on a PostgREST 401, force a
+ * single token refresh and replay the request with the new Authorization
+ * header. Skips /auth/v1/* (refresh endpoint itself returns 401 when the
+ * refresh token is dead — retrying would loop).
+ */
+async function timeoutFetchWithAuthRetry(input, init) {
+  const res = await timeoutFetch(input, init);
+  if (res.status !== 401) return res;
+
+  const url = requestUrl(input);
+  if (url.includes('/auth/v1/')) return res;
+
+  const session = await refreshOnce();
+  if (!session?.access_token) return res;
+
+  // Body replay is safe: supabase-js sends JSON strings, not streams.
+  const newInit = { ...(init || {}) };
+  const headers = new Headers(newInit.headers || {});
+  headers.set('Authorization', `Bearer ${session.access_token}`);
+  newInit.headers = headers;
+
+  debug('401 -> refreshed + retrying ->', url);
+  return timeoutFetch(input, newInit);
+}
+
 export const supabase = createClient(
   supabaseUrl ?? 'https://placeholder.supabase.co',
   supabaseAnonKey ?? 'placeholder',
@@ -106,10 +151,11 @@ export const supabase = createClient(
       detectSessionInUrl: true,
     },
     global: {
-      fetch: timeoutFetch,
+      fetch: timeoutFetchWithAuthRetry,
     },
   }
 );
+_supabase = supabase;
 
 /**
  * Ensure we have a valid session. Calls getSession() which triggers an

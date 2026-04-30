@@ -5,7 +5,7 @@ import { getSets, getSetCards } from '../services/searchService.js';
 import { searchMtgCards } from '../services/mtgService.js';
 import { searchYgoCards } from '../services/yugiohService.js';
 import { getOpSets, getOpSetCards } from '../services/onepieceService.js';
-import { getOwnedApiIds } from '../services/cardService.js';
+import { useOwnedApiIds } from '../hooks/queries.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import CardDetailModal from './CardDetailModal.jsx';
 
@@ -56,8 +56,8 @@ export default function SetsPage() {
   const [searchPage, setSearchPage] = useState(1);
   const [searchTotalPages, setSearchTotalPages] = useState(0);
 
-  // Ownership tracking
-  const [ownedIds, setOwnedIds] = useState(new Set());
+  // Ownership tracking — query auto-refetches on focus/reconnect.
+  const { data: ownedIds = new Set() } = useOwnedApiIds(profile?.id);
   const [modalCard, setModalCard] = useState(null);
 
   // ── Load Pokémon sets on mount ──────────────────────────────────────────
@@ -77,14 +77,6 @@ export default function SetsPage() {
       setLoadingOpSets(false);
     });
   }, [activeGame, opSets.length]);
-
-  // ── Ownership tracking ─────────────────────────────────────────────────
-  useEffect(() => {
-    if (!profile?.id) return;
-    getOwnedApiIds(profile.id).then(({ data }) => {
-      if (data) setOwnedIds(data);
-    });
-  }, [profile?.id]);
 
   // ── Pokémon filtering ──────────────────────────────────────────────────
   const seriesList = useMemo(() => {

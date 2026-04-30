@@ -6,15 +6,19 @@ import {
   onAuthStateChange,
 } from '../services/supabaseAuth.js';
 import { supabase } from '../supabase.js';
+import { queryClient } from '../queryClient.js';
 import { getProfile, createProfile } from '../services/profileService.js';
 
 const AuthContext = createContext(null);
 
+// Profile is cached in sessionStorage so ProtectedRoute can optimistically
+// render the app on a hard refresh without waiting for the auth bootstrap.
+// Binder/card data lives in the React Query cache (see queryClient.js).
 const PROFILE_CACHE_KEY = 'pkb_profile_cache';
-const BINDERS_CACHE_KEY = 'pkb_binders_cache';
-const VIEW_CACHE_KEY = 'pkb_dashboard_view';
 
-// ── Session-Storage helpers ─────────────────────────────────────────────────
+// Legacy keys we proactively clear on sign-out so old cached data from
+// previous app versions doesn't leak between accounts on the same device.
+const LEGACY_KEYS = ['pkb_binders_cache', 'pkb_dashboard_view', 'pkb_cards_cache'];
 
 function getCachedProfile() {
   try { return JSON.parse(sessionStorage.getItem(PROFILE_CACHE_KEY)); }
@@ -24,12 +28,8 @@ function cacheProfile(p) {
   try { p ? sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p)) : sessionStorage.removeItem(PROFILE_CACHE_KEY); }
   catch { /* ignore */ }
 }
-export function getCachedBinders() {
-  try { return JSON.parse(sessionStorage.getItem(BINDERS_CACHE_KEY)); }
-  catch { return null; }
-}
-export function cacheBinders(b) {
-  try { b ? sessionStorage.setItem(BINDERS_CACHE_KEY, JSON.stringify(b)) : sessionStorage.removeItem(BINDERS_CACHE_KEY); }
+function clearLegacyCaches() {
+  try { LEGACY_KEYS.forEach(k => sessionStorage.removeItem(k)); }
   catch { /* ignore */ }
 }
 
@@ -119,13 +119,15 @@ export function AuthProvider({ children }) {
       if (event === 'SIGNED_OUT') {
         if (explicitSignOutRef.current) {
           setUser(null); setProfile(null);
-          cacheProfile(null); cacheBinders(null);
-          try { sessionStorage.removeItem(VIEW_CACHE_KEY); } catch { /* ignore */ }
+          cacheProfile(null);
+          clearLegacyCaches();
+          queryClient.clear();
           explicitSignOutRef.current = false;
         }
-        // Transient SIGNED_OUT: do nothing. Don't clear state.
-        // The visibilitychange handler and ensureValidSession() in the
-        // service layer will recover the session when needed.
+        // Transient SIGNED_OUT (failed token refresh, brief network blip):
+        // do nothing. The next service call will hit the 401 interceptor
+        // in supabase.js, which refreshes + retries — or surfaces the
+        // failure cleanly so the user can re-auth.
         return;
       }
 
@@ -146,41 +148,12 @@ export function AuthProvider({ children }) {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Visibility / online / periodic session refresh ────────────────────────
-  // Three triggers keep the JWT alive so the next DB call always works:
-  //   1. Tab becomes visible (defeats background-tab setTimeout throttling).
-  //   2. Browser reports we're back online (network reconnected).
-  //   3. Every 4 minutes while user is signed in (catches everything else).
-  //
-  // Throttled to one refresh per 30s — without this, alt-tabbing rapidly
-  // (OS notifications, dev-tools focus, etc.) fired getSession() over and
-  // over, and each one could trigger a TOKEN_REFRESHED event that cascaded
-  // into re-renders. See Mistakes Log #18 and #21.
-  useEffect(() => {
-    let lastRefreshAt = 0;
-    const MIN_INTERVAL_MS = 30_000;
-
-    function refreshIfSignedIn() {
-      if (!userRef.current) return;
-      const now = Date.now();
-      if (now - lastRefreshAt < MIN_INTERVAL_MS) return;
-      lastRefreshAt = now;
-      supabase.auth.getSession().catch(() => {});
-    }
-    function handleVisibility() {
-      if (document.visibilityState === 'visible') refreshIfSignedIn();
-    }
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('online', refreshIfSignedIn);
-
-    const intervalId = setInterval(refreshIfSignedIn, 4 * 60 * 1000);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('online', refreshIfSignedIn);
-      clearInterval(intervalId);
-    };
-  }, []);
+  // Token-keepalive listeners (visibilitychange / online / 4-min interval)
+  // used to live here. They were redundant once React Query took over data
+  // fetching: every focus/reconnect now triggers refetchOnWindowFocus /
+  // refetchOnReconnect, which sends a real query that the 401 interceptor in
+  // supabase.js will refresh + retry on if the JWT expired. See Mistakes Log
+  // #18, #21, #23 for the pre-React-Query history.
 
   const refreshProfile = useCallback(async () => {
     if (!userRef.current) return;
@@ -198,8 +171,9 @@ export function AuthProvider({ children }) {
     // request completes (or times out) in the background. See Mistakes Log #22.
     authSignOut().catch((err) => console.error('signOut (background):', err));
     setUser(null); setProfile(null);
-    cacheProfile(null); cacheBinders(null);
-    try { sessionStorage.removeItem(VIEW_CACHE_KEY); } catch { /* ignore */ }
+    cacheProfile(null);
+    clearLegacyCaches();
+    queryClient.clear();
     return { error: null };
   }
 
@@ -216,8 +190,8 @@ export function AuthProvider({ children }) {
         .filter((k) => k.startsWith('sb-'))
         .forEach((k) => localStorage.removeItem(k));
       sessionStorage.removeItem(PROFILE_CACHE_KEY);
-      sessionStorage.removeItem(BINDERS_CACHE_KEY);
-      sessionStorage.removeItem(VIEW_CACHE_KEY);
+      clearLegacyCaches();
+      queryClient.clear();
     } catch (err) {
       console.error('forceSignOut cleanup:', err);
     }
