@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
 import { Book, RefreshCw, Layers, BarChart2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import './App.css';
@@ -41,24 +41,34 @@ import { searchMtgCards, mtgCardToDbRow } from './services/mtgService.js';
 import { searchYgoCards, ygoCardToDbRow } from './services/yugiohService.js';
 import { searchOpCards, opCardToDbRow } from './services/onepieceService.js';
 
-// ─── Dashboard view-state cache ──────────────────────────────────────────────
-// Persists `view`, `selectedBinder` (with cards), and `currentPage` across
-// page refreshes so the user lands back where they were. Stored in
-// sessionStorage so it doesn't leak between tabs / accounts.
+// ─── Per-binder cards cache ──────────────────────────────────────────────────
+// Stores the most recent `binder_cards` rows per binder id in sessionStorage.
+// Lets BinderView paint instantly on a hard refresh while a fresh fetch runs
+// in the background. URL is the source of truth for which binder/page is open
+// — see Dashboard() below.
 
-const VIEW_CACHE_KEY = 'pkb_dashboard_view';
+const CARDS_CACHE_KEY = 'pkb_cards_cache';
 
-function getCachedView() {
-  try { return JSON.parse(sessionStorage.getItem(VIEW_CACHE_KEY)); }
-  catch { return null; }
+function getCardsCacheMap() {
+  try { return JSON.parse(sessionStorage.getItem(CARDS_CACHE_KEY)) || {}; }
+  catch { return {}; }
 }
-function cacheView(state) {
-  try { sessionStorage.setItem(VIEW_CACHE_KEY, JSON.stringify(state)); }
-  catch { /* ignore quota / serialization errors */ }
+function getCachedCards(binderId) {
+  return getCardsCacheMap()[binderId] || null;
 }
-function clearViewCache() {
-  try { sessionStorage.removeItem(VIEW_CACHE_KEY); }
-  catch { /* ignore */ }
+function cacheCards(binderId, rows) {
+  try {
+    const map = getCardsCacheMap();
+    map[binderId] = rows || [];
+    sessionStorage.setItem(CARDS_CACHE_KEY, JSON.stringify(map));
+  } catch { /* ignore quota / serialization errors */ }
+}
+function evictCachedCards(binderId) {
+  try {
+    const map = getCardsCacheMap();
+    delete map[binderId];
+    sessionStorage.setItem(CARDS_CACHE_KEY, JSON.stringify(map));
+  } catch { /* ignore */ }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -114,28 +124,27 @@ function PageLoader() {
 function Dashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const { binderId } = useParams();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // ── View state ──────────────────────────────────────────────────────────────
-  // Restore view + selectedBinder + currentPage from sessionStorage so a page
-  // refresh doesn't dump the user back to the binders list. 'editBinder' is
-  // transient so we coerce it back to 'binderView' if cached.
-  const cachedView = getCachedView();
-  const restoredView = cachedView?.view === 'editBinder' ? 'binderView' : cachedView?.view;
+  // ── View state derived from URL ────────────────────────────────────────────
+  // The URL is the source of truth so refresh always restores the user's spot.
+  //   /                       → binders list
+  //   /binder/:id             → binder grid (?page=N for current page)
+  //   /binder/:id/edit        → cover editor
+  const isEditPath = location.pathname.endsWith('/edit');
+  const view = !binderId ? 'binders' : (isEditPath ? 'editBinder' : 'binderView');
+  const currentPage = parseInt(searchParams.get('page'), 10) || 0;
 
-  const [view, setView] = useState(restoredView || 'binders');
+  const setCurrentPage = (next) => {
+    const value = typeof next === 'function' ? next(currentPage) : next;
+    setSearchParams(value > 0 ? { page: String(value) } : {}, { replace: true });
+  };
+
   const [binders, setBinders] = useState(() => getCachedBinders() || []);
-  const [selectedBinder, setSelectedBinder] = useState(cachedView?.selectedBinder ?? null);
-  const [currentPage, setCurrentPage] = useState(cachedView?.currentPage ?? 0);
+  const [selectedBinder, setSelectedBinder] = useState(null);
   const [syncing, setSyncing] = useState(false);
-
-  // Persist view state on every change so we can restore on refresh.
-  useEffect(() => {
-    if (view === 'binders' && !selectedBinder) {
-      clearViewCache();
-    } else {
-      cacheView({ view, selectedBinder, currentPage });
-    }
-  }, [view, selectedBinder, currentPage]);
 
   // ── Search state ─────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -184,39 +193,68 @@ function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
 
-  // After binders load, if we restored a `selectedBinder` from cache, silently
-  // refresh its cards so anything changed in another tab is reflected. If the
-  // binder no longer exists (deleted elsewhere), drop back to the binders view.
-  const didRestoreSelectedRef = React.useRef(false);
+  // ── Sync `selectedBinder` to the URL ──────────────────────────────────────
+  // Whenever `binderId` (from the URL) changes, find that binder in our list,
+  // optimistically paint from the per-binder cards cache, then refresh in the
+  // background. If the binder isn't found once binders have loaded, send the
+  // user back to the dashboard.
   useEffect(() => {
-    if (didRestoreSelectedRef.current) return;
-    if (!profile?.id || !selectedBinder?.id || binders.length === 0) return;
-    didRestoreSelectedRef.current = true;
-
-    const stillExists = binders.some(b => b.id === selectedBinder.id);
-    if (!stillExists) {
+    if (!binderId) {
       setSelectedBinder(null);
-      setView('binders');
-      setCurrentPage(0);
+      return;
+    }
+    if (binders.length === 0) return; // wait for binders to load
+
+    const meta = binders.find(b => b.id === binderId);
+    if (!meta) {
+      toast.error('Binder not found.');
+      navigate('/', { replace: true });
       return;
     }
 
-    // Silent background refresh — paint stays, no Syncing pill.
+    // Optimistic paint — only swap in cached/empty cards if we don't already
+    // have the right binder loaded (avoids clobbering local edits).
+    if (!selectedBinder || selectedBinder.id !== binderId) {
+      const cachedRows = getCachedCards(binderId);
+      const cards = cachedRows
+        ? buildCardsArray(meta.rows, meta.cols, meta.pages, cachedRows)
+        : Array(meta.rows * meta.cols * meta.pages).fill(null);
+      setSelectedBinder({ ...meta, cards });
+    }
+
+    // Background refresh
+    let cancelled = false;
     (async () => {
-      const { data: cardRows, error } = await getBinderCards(selectedBinder.id);
-      if (error) return;
-      const fresh = binders.find(b => b.id === selectedBinder.id) || selectedBinder;
-      const cards = buildCardsArray(fresh.rows, fresh.cols, fresh.pages, cardRows);
-      setSelectedBinder({ ...fresh, cards });
+      const { data: cardRows, error } = await getBinderCards(binderId);
+      if (cancelled || error) return;
+      cacheCards(binderId, cardRows || []);
+      setSelectedBinder(prev => {
+        if (!prev || prev.id !== binderId) return prev;
+        const fresh = binders.find(b => b.id === binderId) || meta;
+        return {
+          ...fresh,
+          cards: buildCardsArray(fresh.rows, fresh.cols, fresh.pages, cardRows),
+        };
+      });
     })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id, binders.length]);
+  }, [binderId, binders]);
 
   useEffect(() => {
     const theme = BACKGROUND_THEMES[appSettings.backgroundTheme] || BACKGROUND_THEMES.default;
     document.body.style.background = theme.css;
     document.body.style.minHeight = '100vh';
   }, [appSettings.backgroundTheme]);
+
+  // Keep the per-binder cards cache in sync with local card-array mutations
+  // (add / remove / swap). Skips the empty placeholder shape so we don't
+  // overwrite real cached rows with all-null arrays during optimistic paint.
+  useEffect(() => {
+    if (!selectedBinder?.id) return;
+    const rows = (selectedBinder.cards || []).filter(c => c && c.id);
+    if (rows.length > 0) cacheCards(selectedBinder.id, rows);
+  }, [selectedBinder]);
 
   // ── Settings helpers ──────────────────────────────────────────────────────
   const loadAppSettings = () => {
@@ -329,16 +367,17 @@ function Dashboard() {
     }
   };
 
-  const handleDeleteBinder = async (binderId) => {
+  const handleDeleteBinder = async (deletedId) => {
     setSyncing(true);
     try {
-      const { error } = await deleteBinderSvc(binderId);
+      const { error } = await deleteBinderSvc(deletedId);
       if (error) { toast.error('Failed to delete binder.'); return; }
       setBinders(prev => {
-        const next = prev.filter(b => b.id !== binderId);
+        const next = prev.filter(b => b.id !== deletedId);
         cacheBinders(next);
         return next;
       });
+      evictCachedCards(deletedId);
       toast.success('Binder deleted.');
     } catch (err) {
       console.error('handleDeleteBinder:', err);
@@ -367,22 +406,10 @@ function Dashboard() {
     }
   };
 
-  // ── Open binder: fetch cards and reconstruct slot array ───────────────────
-  const handleSelectBinder = async (binder) => {
-    setSyncing(true);
-    try {
-      const { data: cardRows, error } = await getBinderCards(binder.id);
-      if (error) { toast.error('Failed to load binder.'); return; }
-      const cards = buildCardsArray(binder.rows, binder.cols, binder.pages, cardRows);
-      setSelectedBinder({ ...binder, cards });
-      setCurrentPage(0);
-      setView('binderView');
-    } catch (err) {
-      console.error('handleSelectBinder:', err);
-      toast.error('Failed to load binder.');
-    } finally {
-      setSyncing(false);
-    }
+  // ── Open binder ────────────────────────────────────────────────────────────
+  // Just navigate — the URL-sync effect handles cache paint + background fetch.
+  const handleSelectBinder = (binder) => {
+    navigate(`/binder/${binder.id}`);
   };
 
   // ── Card CRUD ─────────────────────────────────────────────────────────────
@@ -511,7 +538,7 @@ function Dashboard() {
         cover_text: coverData.cover_text,
         cover_image_url,
       });
-      setView('binderView');
+      navigate(`/binder/${selectedBinder.id}`);
     } catch (err) {
       console.error('handleEditBinderSave:', err);
       toast.error('Failed to save cover.');
@@ -574,12 +601,10 @@ function Dashboard() {
             currentPage={currentPage}
             onPageChange={setCurrentPage}
             onBack={() => {
-              setSelectedBinder(null);
-              setCurrentPage(0);
-              setView('binders');
-              loadBinders();
+              navigate('/');
+              loadBinders({ silent: true });
             }}
-            onEditCover={() => setView('editBinder')}
+            onEditCover={() => navigate(`/binder/${selectedBinder.id}/edit`)}
             selectedCell={selectedCell}
             onSelectCell={setSelectedCell}
             onRemoveCard={handleRemoveCard}
@@ -612,7 +637,7 @@ function Dashboard() {
           <EditBinderCover
             binder={selectedBinder}
             onSave={handleEditBinderSave}
-            onCancel={() => setView('binderView')}
+            onCancel={() => navigate(`/binder/${selectedBinder.id}`)}
           />
         )}
 
@@ -675,6 +700,8 @@ export default function App() {
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/binder/:binderId" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/binder/:binderId/edit" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Suspense fallback={<PageLoader />}><SettingsPage /></Suspense></ProtectedRoute>} />
           <Route path="/stats"    element={<ProtectedRoute><Suspense fallback={<PageLoader />}><StatsPage /></Suspense></ProtectedRoute>} />
           <Route path="/sets"     element={<ProtectedRoute><Suspense fallback={<PageLoader />}><SetsPage /></Suspense></ProtectedRoute>} />
