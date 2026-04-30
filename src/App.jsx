@@ -93,7 +93,7 @@ function PageLoader() {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 function Dashboard() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const { binderId } = useParams();
   const location = useLocation();
@@ -438,7 +438,12 @@ function Dashboard() {
           )}
         </div>
 
-        {view === 'binders' && (
+        {/* On hard refresh, `user` hydrates from localStorage instantly but
+            `profile` has to fetch. Render a skeleton in that gap so we don't
+            flash an empty BindersView with a bare "'s Binders" heading. */}
+        {view === 'binders' && user && !profile && <PageLoader />}
+
+        {view === 'binders' && profile && (
           <BindersView
             profile={profile}
             binders={binders}

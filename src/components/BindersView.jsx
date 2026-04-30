@@ -63,7 +63,7 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
   return (
     <div>
       <div className="section-header">
-        <h2>{profile?.name}'s Binders</h2>
+        <h2>{profile?.name ? `${profile.name}'s Binders` : 'Your Binders'}</h2>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <div className="binders-sort">
             <ArrowUpDown size={15} style={{ opacity: 0.6 }} />

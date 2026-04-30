@@ -29,8 +29,14 @@ function cacheProfile(p) {
   catch { /* ignore */ }
 }
 function clearLegacyCaches() {
-  try { LEGACY_KEYS.forEach(k => sessionStorage.removeItem(k)); }
-  catch { /* ignore */ }
+  try {
+    LEGACY_KEYS.forEach(k => sessionStorage.removeItem(k));
+    // Also clear the per-query sessionStorage fallback used by hooks/queries.js
+    // so signed-out devices don't leak the previous user's binders/cards.
+    Object.keys(sessionStorage)
+      .filter(k => k.startsWith('pkb_qcache:'))
+      .forEach(k => sessionStorage.removeItem(k));
+  } catch { /* ignore */ }
 }
 
 // ── Provider ────────────────────────────────────────────────────────────────

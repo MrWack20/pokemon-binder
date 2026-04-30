@@ -20,29 +20,73 @@ function unwrap({ data, error }) {
   return data;
 }
 
+// ── Lightweight sessionStorage fallback ─────────────────────────────────────
+// Lets binders / cards / owned-id queries paint instantly on a hard refresh
+// (before the network fetch finishes) the same way the old Dashboard's
+// sessionStorage cache used to. Each successful fetch writes the result back;
+// initialData reads it on first render. Cleared by AuthContext on sign-out
+// via queryClient.clear() + clearLegacyCaches().
+const SS_PREFIX = 'pkb_qcache:';
+function ssGet(key) {
+  try {
+    const raw = sessionStorage.getItem(SS_PREFIX + key);
+    return raw ? JSON.parse(raw) : undefined;
+  } catch { return undefined; }
+}
+function ssSet(key, value) {
+  try { sessionStorage.setItem(SS_PREFIX + key, JSON.stringify(value)); }
+  catch { /* quota / circular refs — non-fatal */ }
+}
+
 // ─── Queries ─────────────────────────────────────────────────────────────────
 export function useBinders(profileId) {
   return useQuery({
     queryKey: qk.binders(profileId),
-    queryFn: () => binderSvc.getBinders(profileId).then(unwrap).then(d => d || []),
+    queryFn: async () => {
+      const data = await binderSvc.getBinders(profileId).then(unwrap);
+      const next = data || [];
+      ssSet(`binders:${profileId}`, next);
+      return next;
+    },
     enabled: !!profileId,
+    initialData: () => (profileId ? ssGet(`binders:${profileId}`) : undefined),
+    initialDataUpdatedAt: 0, // treat cache as stale → triggers background refetch
   });
 }
 
 export function useBinderCards(binderId) {
   return useQuery({
     queryKey: qk.cards(binderId),
-    queryFn: () => cardSvc.getBinderCards(binderId).then(unwrap).then(d => d || []),
+    queryFn: async () => {
+      const data = await cardSvc.getBinderCards(binderId).then(unwrap);
+      const next = data || [];
+      ssSet(`cards:${binderId}`, next);
+      return next;
+    },
     enabled: !!binderId,
+    initialData: () => (binderId ? ssGet(`cards:${binderId}`) : undefined),
+    initialDataUpdatedAt: 0,
   });
 }
 
 export function useOwnedApiIds(profileId) {
   return useQuery({
     queryKey: qk.ownedApiIds(profileId),
-    // getOwnedApiIds resolves to { data: Set<string>, error }.
-    queryFn: () => cardSvc.getOwnedApiIds(profileId).then(unwrap).then(d => d || new Set()),
+    // getOwnedApiIds resolves to { data: Set<string>, error }. We persist as
+    // an array (Set isn't JSON-serializable) and rehydrate on read.
+    queryFn: async () => {
+      const set = await cardSvc.getOwnedApiIds(profileId).then(unwrap);
+      const arr = set ? [...set] : [];
+      ssSet(`owned:${profileId}`, arr);
+      return new Set(arr);
+    },
     enabled: !!profileId,
+    initialData: () => {
+      if (!profileId) return undefined;
+      const arr = ssGet(`owned:${profileId}`);
+      return Array.isArray(arr) ? new Set(arr) : undefined;
+    },
+    initialDataUpdatedAt: 0,
   });
 }
 
