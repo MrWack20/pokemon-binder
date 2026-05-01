@@ -18,9 +18,15 @@ Built by MrWack (GitHub: MrWack20). Repo: https://github.com/MrWack20/pokemon-bi
 `ROADMAP.md` is located at the project root. It defines 5 phases:
 - **Phase 1** — Foundation, Supabase Migration & Auth ✅ Complete
 - **Phase 2** — Core Feature Enhancements ✅ Complete (core items done; stretch items deferred to Phase 5)
-- **Phase 3** — Multi-Game Expansion ✅ Complete (Scryfall + YGOPRODeck; see notes below)
+- **Phase 3** — Multi-Game Expansion ✅ Complete (Scryfall + YGOPRODeck + OPTCG; see notes below)
 - **Phase 4** — Social & Sharing Features 🔲 Next
-- **Phase 5** — Production & Performance 🔲 Pending
+- **Phase 5** — Production & Performance 🚧 Partially shipped out of order (architecture, deployment, security headers, SPA fallback all done; testing / TS / observability still pending)
+
+### Parallel work-in-progress: `feat/nextjs-migration`
+
+A full **Next.js 16 + `@supabase/ssr`** rebuild lives on the `feat/nextjs-migration` branch. Cookie-based sessions, server-side session validation in `src/proxy.js` on every request, no localStorage tokens. Build is green but **awaiting user validation on a Vercel preview** before merging to `main`. This is the canonical fix for the entire stale-JWT-empty-RLS class of bugs (Mistakes Log #15, #17, #18, #21, #23, #25-26).
+
+**Order of operations for Phase 4:** validate the Next.js preview → merge `feat/nextjs-migration` → `main` → start 4.1 (`is_public` + share links + OG tags) on the new base, since public pages benefit hugely from server rendering.
 
 ### Phase 2 remaining items (from ROADMAP.md)
 These roadmap items from Phase 2 are NOT yet implemented:
