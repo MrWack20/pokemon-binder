@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { X, Save, User, Lock, Mail, Palette } from 'lucide-react';
 import { BACKGROUND_THEMES } from '../constants/themes';

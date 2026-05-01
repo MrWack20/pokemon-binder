@@ -1,0 +1,13 @@
+var R=require("../../chunks/ssr/[turbopack]_runtime.js")("server/app/register/page.js")
+R.c("server/chunks/ssr/[root-of-the-server]__0pufggr._.js")
+R.c("server/chunks/ssr/05il_next_dist_esm_build_templates_app-page_0.d0vdi.js")
+R.c("server/chunks/ssr/[root-of-the-server]__0vspr~8._.js")
+R.c("server/chunks/ssr/[root-of-the-server]__0gz2gf-._.js")
+R.c("server/chunks/ssr/pokemon-binder__claude_worktrees_next-migration_086fn6a._.js")
+R.c("server/chunks/ssr/05il_next_dist_client_components_10.qxe3._.js")
+R.c("server/chunks/ssr/05il_next_dist_client_components_builtin_forbidden_023nn_p.js")
+R.c("server/chunks/ssr/05il_next_dist_client_components_builtin_unauthorized_10wt10b.js")
+R.c("server/chunks/ssr/05il_next_dist_client_components_builtin_global-error_0sivrty.js")
+R.c("server/chunks/ssr/0x4-_next-migration__next-internal_server_app_register_page_actions_0om39z2.js")
+R.m(73605)
+module.exports=R.m(73605).exports

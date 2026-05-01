@@ -142,4 +142,9 @@ export const BACKGROUND_THEMES = {
 
 };
 
-export const API_KEY = import.meta.env.VITE_POKEMON_TCG_API_KEY;
+// In Next.js, browser-readable env vars must be prefixed NEXT_PUBLIC_*.
+// We also fall back to the legacy VITE_* name so Vercel doesn't have to be
+// reconfigured before this branch deploys.
+export const API_KEY =
+  process.env.NEXT_PUBLIC_POKEMON_TCG_API_KEY ||
+  process.env.VITE_POKEMON_TCG_API_KEY;

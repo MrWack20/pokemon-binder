@@ -1,11 +1,11 @@
-import { supabase, ensureValidSession } from '../supabase.js';
+import { createClient } from '@/lib/supabase/client';
 
-/**
- * Fetch all binders for a profile, including a card count.
- * Calls ensureValidSession() first to guarantee the JWT is fresh.
- */
+// All services run from client components (called by React Query hooks).
+// Cookies + middleware keep the session fresh, so no ensureValidSession()
+// dance is needed — we just talk to PostgREST.
+const supabase = createClient();
+
 export async function getBinders(profileId) {
-  await ensureValidSession();
   const { data, error } = await supabase
     .from('binders')
     .select('*, binder_cards(count)')
@@ -15,7 +15,6 @@ export async function getBinders(profileId) {
 }
 
 export async function createBinder(profileId, binderData) {
-  await ensureValidSession();
   const { data, error } = await supabase
     .from('binders')
     .insert({ profile_id: profileId, ...binderData })
@@ -25,7 +24,6 @@ export async function createBinder(profileId, binderData) {
 }
 
 export async function updateBinder(binderId, updates) {
-  await ensureValidSession();
   const { data, error } = await supabase
     .from('binders')
     .update(updates)
@@ -36,7 +34,6 @@ export async function updateBinder(binderId, updates) {
 }
 
 export async function deleteBinder(binderId) {
-  await ensureValidSession();
   const { error } = await supabase
     .from('binders')
     .delete()
@@ -45,14 +42,14 @@ export async function deleteBinder(binderId) {
 }
 
 export async function duplicateBinder(binderId) {
-  await ensureValidSession();
   const { data: source, error: fetchError } = await supabase
     .from('binders')
     .select('*')
     .eq('id', binderId)
     .single();
   if (fetchError) return { data: null, error: fetchError };
-  const { id, created_at, ...fields } = source;
+  // eslint-disable-next-line no-unused-vars
+  const { id: _id, created_at: _ca, ...fields } = source;
   const { data, error } = await supabase
     .from('binders')
     .insert({ ...fields, name: `${source.name} (Copy)` })

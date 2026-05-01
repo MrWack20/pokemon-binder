@@ -1,4 +1,15 @@
-import { supabase, withTimeout } from '../supabase.js';
+import { createClient } from '@/lib/supabase/client';
+
+const supabase = createClient();
+
+function withTimeout(promise, ms, label = 'operation') {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timeout`)), ms)
+    ),
+  ]);
+}
 
 export async function signUp(email, password) {
   const { data, error } = await supabase.auth.signUp({ email, password });
@@ -19,24 +30,19 @@ export async function signInWithGoogle() {
 }
 
 /**
- * Sign out — guaranteed to return within ~3s.
- *
- * Uses scope: 'local' so we don't need a network round-trip to revoke the
- * server session (revocation can complete in the background; the user just
- * needs the client cleared). Even if that hangs, withTimeout() rejects after
- * 3s. The caller (AuthContext) clears local state regardless of the result,
- * so the user can ALWAYS sign out — see Mistakes Log #22.
+ * Sign out — uses scope: 'global' so the server-side cookies are also
+ * invalidated. The middleware's next request validation will then redirect
+ * to /login. 3s timeout so the UI never hangs.
  */
 export async function signOut() {
   try {
     const { error } = await withTimeout(
-      supabase.auth.signOut({ scope: 'local' }),
+      supabase.auth.signOut(),
       3000,
       'signOut'
     );
     return { error };
   } catch (err) {
-    // Timeout or unexpected throw — caller still clears local state.
     return { error: err };
   }
 }

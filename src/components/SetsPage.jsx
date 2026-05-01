@@ -1,12 +1,14 @@
+'use client';
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Search, X, RefreshCw, Layers, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { getSets, getSetCards } from '../services/searchService.js';
-import { searchMtgCards } from '../services/mtgService.js';
-import { searchYgoCards } from '../services/yugiohService.js';
-import { getOpSets, getOpSetCards } from '../services/onepieceService.js';
-import { useOwnedApiIds } from '../hooks/queries.js';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import { getSets, getSetCards } from '@/services/searchService';
+import { searchMtgCards } from '@/services/mtgService';
+import { searchYgoCards } from '@/services/yugiohService';
+import { getOpSets, getOpSetCards } from '@/services/onepieceService';
+import { useOwnedApiIds } from '@/hooks/queries';
+import { useAuth } from '@/contexts/AuthContext';
 import CardDetailModal from './CardDetailModal.jsx';
 
 function getStoredCurrency() {
@@ -24,7 +26,7 @@ const GAME_TABS = [
 ];
 
 export default function SetsPage() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const { profile } = useAuth();
   const currency = getStoredCurrency();
   const symbol = CURRENCY_SYMBOL[currency] || '$';
@@ -155,7 +157,7 @@ export default function SetsPage() {
   function handleBack() {
     if (selectedSet) { setSelectedSet(null); setCards([]); }
     else if (selectedOpSet) { setSelectedOpSet(null); setOpCards([]); }
-    else navigate('/');
+    else router.push('/');
   }
 
   function handleTabChange(gameId) {

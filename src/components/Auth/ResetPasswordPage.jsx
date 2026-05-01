@@ -1,8 +1,10 @@
+'use client';
+
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { Book, Lock, Save } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext.jsx';
-import { updatePassword } from '../../services/supabaseAuth.js';
+import { useAuth } from '@/contexts/AuthContext';
+import { updatePassword } from '@/services/supabaseAuth';
 
 /**
  * Handles password reset links sent by Supabase.
@@ -12,7 +14,7 @@ import { updatePassword } from '../../services/supabaseAuth.js';
  */
 export default function ResetPasswordPage() {
   const { user, loading } = useAuth();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
@@ -29,7 +31,7 @@ export default function ResetPasswordPage() {
     if (err) {
       setError(err.message);
     } else {
-      navigate('/', { replace: true });
+      router.replace('/');
     }
   }
 
@@ -45,7 +47,7 @@ export default function ResetPasswordPage() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
         <p style={{ opacity: 0.7, fontSize: '1.1rem' }}>Invalid or expired reset link.</p>
-        <button className="btn btn-secondary" onClick={() => navigate('/forgot-password')}>
+        <button className="btn btn-secondary" onClick={() => router.push('/forgot-password')}>
           Request a new link
         </button>
       </div>

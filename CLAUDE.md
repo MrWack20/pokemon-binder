@@ -7,7 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 PokéBinder is a web app for organizing and showcasing a Pokémon TCG collection digitally.
 Built by MrWack (GitHub: MrWack20). Repo: https://github.com/MrWack20/pokemon-binder
 
-**Stack:** React 19, Vite 7, Supabase (auth + Postgres + Storage), Pokémon TCG API v2, Lucide React, React Router DOM v7, Recharts, @dnd-kit/core, react-hot-toast.
+**Stack:** React 19, **Next.js 16 (App Router)** on Vercel, Supabase (auth + Postgres + Storage) via **`@supabase/ssr` (cookie-based sessions)**, TanStack Query v5, Pokémon TCG API v2, Lucide React, Recharts, @dnd-kit/core, react-hot-toast.
+
+> **Architecture note (migrated 2026-05-01):** the app moved from a Vite SPA + browser-only Supabase client to Next.js App Router with server-side session validation. All auth now flows through HttpOnly cookies set by the proxy (`src/proxy.js` → `lib/supabase/middleware.js`). The browser, server, and proxy each get a Supabase client variant from `src/lib/supabase/{client,server,middleware}.js`. `localStorage` is no longer used for tokens; sign-out genuinely clears the session.
 
 ---
 
@@ -79,16 +81,16 @@ When planning next steps, proceed to Phase 4 (Social & Sharing).
 ## Commands
 
 ```bash
-npm run dev        # Start local dev server on port 5173
-npm run build      # Production build → dist/
-npm run preview    # Serve the production build locally
-npm run lint       # ESLint (eslint-plugin-react-hooks + react-refresh)
+npm run dev        # Start Next.js dev server on port 3000
+npm run build      # Production build (Turbopack) → .next/
+npm run start      # Serve the production build
+npm run lint       # next lint
 ```
 
-When asked to "run the dev server" or "open the app", start the dev server AND open `http://localhost:5173` in Chrome:
+When asked to "run the dev server" or "open the app", start the dev server AND open `http://localhost:3000` in Chrome:
 ```bash
 npm run dev &
-start chrome http://localhost:5173
+start chrome http://localhost:3000
 ```
 
 No test suite is configured. There is no `npm test`.
@@ -97,13 +99,15 @@ No test suite is configured. There is no `npm test`.
 
 ## Environment Variables
 
-Copy `.env.example` to `.env`. Required vars:
+Copy `.env.example` to `.env.local`. Required vars (Next.js convention — the `NEXT_PUBLIC_` prefix is required for any var the browser reads):
 
 ```
-VITE_SUPABASE_URL=https://ssdmmlxnzlgjriqddpin.supabase.co
-VITE_SUPABASE_ANON_KEY=<anon key>
-VITE_POKEMON_TCG_API_KEY=<tcg api key>
+NEXT_PUBLIC_SUPABASE_URL=https://ssdmmlxnzlgjriqddpin.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+NEXT_PUBLIC_POKEMON_TCG_API_KEY=<tcg api key>
 ```
+
+The legacy `VITE_*` names are also accepted as a fallback (see `src/lib/supabase/env.js` and `src/constants/themes.js`) so a Vercel project that hasn't been reconfigured yet still boots.
 
 On Vercel, `VITE_SUPABASE_URL` must be set for **both** Production *and* Preview environments separately. The other two vars can be set for all environments at once. Vite bakes these into the bundle at build time; changing them requires a new deployment.
 

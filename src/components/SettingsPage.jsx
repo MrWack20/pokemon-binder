@@ -1,11 +1,13 @@
+'use client';
+
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { Save, User, Lock, Mail, Palette, ArrowLeft, LogOut, DollarSign } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { BACKGROUND_THEMES } from '../constants/themes';
-import { useAuth } from '../contexts/AuthContext.jsx';
-import { useUpdateProfile } from '../hooks/queries.js';
-import { updateEmail, updatePassword } from '../services/supabaseAuth.js';
+import { BACKGROUND_THEMES } from '@/constants/themes';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUpdateProfile } from '@/hooks/queries';
+import { updateEmail, updatePassword } from '@/services/supabaseAuth';
 
 const SETTINGS_KEY = 'pokemonBinderSettings';
 
@@ -20,7 +22,7 @@ function loadSettings() {
 
 export default function SettingsPage() {
   const { user, profile, setProfile, signOut } = useAuth();
-  const navigate = useNavigate();
+  const router = useRouter();
   const updateProfileMut = useUpdateProfile();
 
   const [selectedTheme, setSelectedTheme] = useState(() => loadSettings().backgroundTheme);
@@ -102,7 +104,7 @@ export default function SettingsPage() {
         <div className="settings-page">
 
           <div className="settings-header">
-            <button onClick={() => navigate('/')} className="btn btn-secondary">
+            <button onClick={() => router.push('/')} className="btn btn-secondary">
               <ArrowLeft size={18} />Back to App
             </button>
             <h2>Settings</h2>

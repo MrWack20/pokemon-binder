@@ -1,19 +1,25 @@
+'use client';
+
 import React, { useState } from 'react';
-import { Link, useNavigate, Navigate } from 'react-router-dom';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Book, Mail, Lock, LogIn } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext.jsx';
-import { signInWithGoogle } from '../../services/supabaseAuth.js';
+import { useAuth } from '@/contexts/AuthContext';
+import { signInWithGoogle } from '@/services/supabaseAuth';
 
 export default function LoginPage() {
-  const { user, loading, signIn } = useAuth();
-  const navigate = useNavigate();
+  const { signIn } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get('next') || '/';
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Redirect already-authenticated users
-  if (!loading && user) return <Navigate to="/" replace />;
+  // Note: middleware already redirects authenticated users away from /login,
+  // so we don't need a client-side guard here.
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -22,7 +28,10 @@ export default function LoginPage() {
     const { error: err } = await signIn(email, password);
     setSubmitting(false);
     if (err) setError(err.message);
-    else navigate('/', { replace: true });
+    else {
+      router.replace(next);
+      router.refresh();
+    }
   }
 
   async function handleGoogle() {
@@ -81,7 +90,7 @@ export default function LoginPage() {
             </div>
 
             <div className="auth-forgot">
-              <Link to="/forgot-password">Forgot password?</Link>
+              <Link href="/forgot-password">Forgot password?</Link>
             </div>
 
             <button
@@ -103,8 +112,8 @@ export default function LoginPage() {
         </div>
 
         <p className="auth-switch">
-          Don't have an account?{' '}
-          <Link to="/register">Create one</Link>
+          Don&apos;t have an account?{' '}
+          <Link href="/register">Create one</Link>
         </p>
       </div>
     </div>

@@ -1,4 +1,6 @@
-import { supabase } from '../supabase.js';
+import { createClient } from '@/lib/supabase/client';
+
+const supabase = createClient();
 
 /**
  * Fetch all collection statistics for a profile.

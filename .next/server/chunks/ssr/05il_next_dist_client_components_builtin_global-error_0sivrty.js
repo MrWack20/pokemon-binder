@@ -1,0 +1,3 @@
+module.exports=[91131,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(14348);a.n(d("[project]/pokemon-binder/.claude/worktrees/next-migration/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},5857,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(14348);a.n(d("[project]/pokemon-binder/.claude/worktrees/next-migration/node_modules/next/dist/client/components/builtin/global-error.js"))},50478,a=>{"use strict";a.i(91131);var b=a.i(5857);a.n(b)},7725,a=>{a.n(a.i(50478))}];
+
+//# sourceMappingURL=05il_next_dist_client_components_builtin_global-error_0sivrty.js.map

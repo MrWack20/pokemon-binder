@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useMemo } from 'react';
 import { Plus, Trash2, Eye, Copy, ArrowUpDown } from 'lucide-react';
 import toast from 'react-hot-toast';

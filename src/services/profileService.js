@@ -1,7 +1,8 @@
-import { supabase, ensureValidSession } from '../supabase.js';
+import { createClient } from '@/lib/supabase/client';
+
+const supabase = createClient();
 
 export async function getProfile(userId) {
-  await ensureValidSession();
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
@@ -11,7 +12,6 @@ export async function getProfile(userId) {
 }
 
 export async function createProfile(userId, name) {
-  await ensureValidSession();
   const { data, error } = await supabase
     .from('profiles')
     .insert({ user_id: userId, name })
@@ -21,7 +21,6 @@ export async function createProfile(userId, name) {
 }
 
 export async function updateProfile(profileId, updates) {
-  await ensureValidSession();
   const { data, error } = await supabase
     .from('profiles')
     .update(updates)
@@ -32,7 +31,6 @@ export async function updateProfile(profileId, updates) {
 }
 
 export async function deleteProfile(profileId) {
-  await ensureValidSession();
   const { error } = await supabase
     .from('profiles')
     .delete()

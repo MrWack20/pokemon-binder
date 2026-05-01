@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { Edit2, Save, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';

@@ -1,12 +1,14 @@
+'use client';
+
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { Settings, LogOut, ChevronDown, Loader, BarChart2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useAuth } from '../../contexts/AuthContext.jsx';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function UserMenu() {
   const { user, profile, signOut, forceSignOut } = useAuth();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const menuRef = useRef(null);
@@ -81,12 +83,12 @@ export default function UserMenu() {
             <MenuItem
               icon={<BarChart2 size={16} />}
               label="Statistics"
-              onClick={() => { setOpen(false); navigate('/stats'); }}
+              onClick={() => { setOpen(false); router.push('/stats'); }}
             />
             <MenuItem
               icon={<Settings size={16} />}
               label="Settings"
-              onClick={() => { setOpen(false); navigate('/settings'); }}
+              onClick={() => { setOpen(false); router.push('/settings'); }}
             />
             <div style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '4px 6px' }} />
             <MenuItem

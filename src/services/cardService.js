@@ -1,7 +1,8 @@
-import { supabase, ensureValidSession } from '../supabase.js';
+import { createClient } from '@/lib/supabase/client';
+
+const supabase = createClient();
 
 export async function getBinderCards(binderId) {
-  await ensureValidSession();
   const { data, error } = await supabase
     .from('binder_cards')
     .select('*')
@@ -15,7 +16,6 @@ export async function getBinderCards(binderId) {
  * Deletes any existing card in that slot first, then inserts the new one.
  */
 export async function addCard(binderId, slotIndex, cardData) {
-  await ensureValidSession();
   // If the DELETE silently fails (e.g. RLS denies it), the INSERT will hit the
   // UNIQUE(binder_id, slot_index) constraint with a confusing error. Surface
   // the real problem instead.
@@ -35,7 +35,6 @@ export async function addCard(binderId, slotIndex, cardData) {
 }
 
 export async function removeCard(cardId) {
-  await ensureValidSession();
   const { error } = await supabase
     .from('binder_cards')
     .delete()
@@ -44,7 +43,6 @@ export async function removeCard(cardId) {
 }
 
 export async function moveCard(cardId, newSlotIndex) {
-  await ensureValidSession();
   const { data: card, error: fetchError } = await supabase
     .from('binder_cards')
     .select('*')
@@ -71,7 +69,6 @@ export async function moveCard(cardId, newSlotIndex) {
  * Return a Set of all card_api_id values owned by a profile across all binders.
  */
 export async function getOwnedApiIds(profileId) {
-  await ensureValidSession();
   const { data: binders, error: be } = await supabase
     .from('binders')
     .select('id')
@@ -91,7 +88,6 @@ export async function getOwnedApiIds(profileId) {
  * Swap two cards between slots using sentinel slot -1 for the UNIQUE constraint.
  */
 export async function swapCards(cardId1, cardId2) {
-  await ensureValidSession();
   const { data: cards, error: fetchError } = await supabase
     .from('binder_cards')
     .select('id, slot_index')

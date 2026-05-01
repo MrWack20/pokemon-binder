@@ -1,16 +1,15 @@
+'use client';
+
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { Book, Mail, ArrowLeft } from 'lucide-react';
-import { resetPassword } from '../../services/supabaseAuth.js';
-import { runDiagnostics } from '../../supabase.js';
+import { resetPassword } from '@/services/supabaseAuth';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [diagnosing, setDiagnosing] = useState(false);
-  const [diag, setDiag] = useState(null);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -20,17 +19,6 @@ export default function ForgotPasswordPage() {
     setLoading(false);
     if (err) setError(`${err.message} — open DevTools console for details.`);
     else setSent(true);
-  }
-
-  async function handleDiagnose() {
-    setDiagnosing(true);
-    setDiag(null);
-    try {
-      const report = await runDiagnostics();
-      setDiag(report);
-    } finally {
-      setDiagnosing(false);
-    }
   }
 
   return (
@@ -48,7 +36,7 @@ export default function ForgotPasswordPage() {
             <>
               <h2 style={{ marginBottom: '8px', textAlign: 'center' }}>Forgot password?</h2>
               <p style={{ opacity: 0.7, textAlign: 'center', marginBottom: '24px', fontSize: '0.95rem' }}>
-                Enter your email and we'll send you a reset link.
+                Enter your email and we&apos;ll send you a reset link.
               </p>
               {error && <div style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.5)', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px' }}>{error}</div>}
               <form onSubmit={handleSubmit}>
@@ -75,38 +63,14 @@ export default function ForgotPasswordPage() {
                 Not arriving? Check <strong>spam</strong>, wait a minute, and try again.
                 Free-tier Supabase limits to ~3 reset emails/hour.
               </p>
-              <Link to="/login"><button className="btn btn-secondary" style={{ justifyContent: 'center' }}>Back to sign in</button></Link>
+              <Link href="/login"><button className="btn btn-secondary" style={{ justifyContent: 'center' }}>Back to sign in</button></Link>
             </div>
           )}
-
-          {/* Diagnostics — visible on both states so the user can self-test */}
-          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-            <button
-              type="button"
-              onClick={handleDiagnose}
-              disabled={diagnosing}
-              className="btn btn-secondary"
-              style={{ width: '100%', justifyContent: 'center', fontSize: '0.85rem', padding: '8px 14px' }}
-            >
-              {diagnosing ? 'Running…' : 'Test Supabase connection'}
-            </button>
-            {diag && (
-              <div style={{ marginTop: '12px', fontSize: '0.78rem', fontFamily: 'monospace', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px 12px', lineHeight: 1.6 }}>
-                <div>env.url: {diag.env.url}</div>
-                <div>env.anonKey: {diag.env.anonKey}</div>
-                <div>auth.getSession: {diag.auth.getSession}</div>
-                <div>db.ping: {diag.db.ping}</div>
-                <div style={{ marginTop: '6px', color: diag.ok ? '#4ade80' : '#f87171' }}>
-                  {diag.ok ? '✓ healthy' : '✗ problems detected — see console'}
-                </div>
-              </div>
-            )}
-          </div>
         </div>
 
         {!sent && (
           <p style={{ textAlign: 'center', marginTop: '24px' }}>
-            <Link to="/login" style={{ color: 'rgba(255,255,255,0.6)', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.95rem' }}>
+            <Link href="/login" style={{ color: 'rgba(255,255,255,0.6)', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.95rem' }}>
               <ArrowLeft size={16} />Back to sign in
             </Link>
           </p>

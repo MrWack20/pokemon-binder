@@ -1,12 +1,13 @@
+'use client';
+
 import React, { useState } from 'react';
-import { Link, useNavigate, Navigate } from 'react-router-dom';
+import Link from 'next/link';
 import { Book, Mail, Lock, UserPlus } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext.jsx';
-import { signInWithGoogle } from '../../services/supabaseAuth.js';
+import { useAuth } from '@/contexts/AuthContext';
+import { signInWithGoogle } from '@/services/supabaseAuth';
 
 export default function RegisterPage() {
-  const { user, loading, signUp } = useAuth();
-  const navigate = useNavigate();
+  const { signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -14,8 +15,7 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Redirect already-authenticated users
-  if (!loading && user) return <Navigate to="/" replace />;
+  // Middleware redirects authenticated users away from /register.
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -54,7 +54,7 @@ export default function RegisterPage() {
             <div className="auth-success">
               <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>📬</div>
               <p style={{ marginBottom: '20px', lineHeight: 1.6 }}>{success}</p>
-              <Link to="/login">
+              <Link href="/login">
                 <button className="btn btn-primary auth-submit-btn">Go to sign in</button>
               </Link>
             </div>
@@ -124,7 +124,7 @@ export default function RegisterPage() {
 
         <p className="auth-switch">
           Already have an account?{' '}
-          <Link to="/login">Sign in</Link>
+          <Link href="/login">Sign in</Link>
         </p>
       </div>
     </div>

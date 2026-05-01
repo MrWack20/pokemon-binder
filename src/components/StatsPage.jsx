@@ -1,12 +1,14 @@
+'use client';
+
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell, AreaChart, Area, CartesianGrid,
 } from 'recharts';
 import { ArrowLeft, TrendingUp, Package, DollarSign, BookOpen, RefreshCw } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext.jsx';
-import { useCollectionStats } from '../hooks/queries.js';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCollectionStats } from '@/hooks/queries';
 
 const CHART_COLORS = ['#fbbf24', '#3b82f6', '#10b981', '#f87171', '#a78bfa', '#34d399', '#fb923c', '#60a5fa'];
 
@@ -52,7 +54,7 @@ function StatCard({ icon: Icon, label, value, sub, color }) {
 
 export default function StatsPage() {
   const { profile } = useAuth();
-  const navigate = useNavigate();
+  const router = useRouter();
   const { data: stats, isLoading: loading, error } = useCollectionStats(profile?.id);
 
   const savedSettings = (() => { try { return JSON.parse(localStorage.getItem('pokemonBinderSettings') || '{}'); } catch { return {}; } })();
@@ -66,7 +68,7 @@ export default function StatsPage() {
 
           {/* Header */}
           <div className="stats-header">
-            <button onClick={() => navigate('/')} className="btn btn-secondary">
+            <button onClick={() => router.push('/')} className="btn btn-secondary">
               <ArrowLeft size={18} />My Binders
             </button>
             <h2>Collection Statistics</h2>
@@ -285,7 +287,7 @@ export default function StatsPage() {
                   <p style={{ opacity: 0.55 }}>
                     Add cards to your binders and your stats will appear here.
                   </p>
-                  <button onClick={() => navigate('/')} className="btn btn-primary" style={{ marginTop: '20px', justifyContent: 'center' }}>
+                  <button onClick={() => router.push('/')} className="btn btn-primary" style={{ marginTop: '20px', justifyContent: 'center' }}>
                     Go to My Binders
                   </button>
                 </div>
