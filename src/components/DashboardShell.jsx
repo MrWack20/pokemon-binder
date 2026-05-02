@@ -335,6 +335,9 @@ export default function DashboardShell() {
           cover_color: coverData.cover_color,
           cover_text: coverData.cover_text,
           cover_image_url,
+          // is_public is optional in coverData; pass through only when defined
+          // so old call sites that don't set it stay backwards compatible.
+          ...(typeof coverData.is_public === 'boolean' && { is_public: coverData.is_public }),
         },
       });
       router.push(`/binder/${selectedBinder.id}`);

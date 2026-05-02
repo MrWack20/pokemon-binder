@@ -8,7 +8,8 @@ const PUBLIC_PREFIXES = [
   '/login',
   '/register',
   '/forgot-password',
-  '/auth', // /auth/callback, /auth/reset-password
+  '/auth',  // /auth/callback, /auth/reset-password
+  '/share', // /share/<binderId> — read-only public binder view (Phase 4.1)
 ];
 
 function isPublicPath(pathname) {
