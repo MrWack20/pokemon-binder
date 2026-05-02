@@ -4,18 +4,24 @@
 
 ---
 
-## Current State (v0.4 — Production, public)
+## Current State (v0.5 — Next.js + cookie sessions, production)
 
 **Last updated:** 2026-05-01
 
 The app is **live in production** at the project's Vercel domain. Anyone with the link can sign up, build binders, and use every feature listed in Phases 1–3.
 
+**Architecture (NEW on this version):**
+- React 19 + **Next.js 16 (App Router)** on Vercel, auto-deploys from `main`
+- **`@supabase/ssr` with HttpOnly cookies** — session lifecycle is server-validated on every request via `src/proxy.js`
+- Three Supabase client variants: browser (`lib/supabase/client.js`), server components (`lib/supabase/server.js`), proxy (`lib/supabase/middleware.js`)
+- localStorage tokens are gone; sign-out genuinely clears the session
+- Eliminates the entire stale-JWT-empty-RLS class of bug we patched in the Vite SPA (Mistakes Log #15, #17, #18, #21, #23, #25-26)
+
 **What's shipped:**
-- React 19 + Vite 7 SPA, deployed to Vercel from `main` (auto-deploys on push)
 - Supabase Auth (email/password + Google OAuth + password reset + email verification)
 - Supabase Postgres with RLS — `profiles`, `binders`, `binder_cards` tables, all access enforced server-side
 - Supabase Storage bucket (`binder-covers`) for cover image uploads
-- TanStack Query v5 for client-side server-state (caching, optimistic updates, refetch-on-focus, retry, 401 interceptor with single-flight refresh)
+- TanStack Query v5 for client-side server-state (caching, optimistic updates, refetch-on-focus, retry)
 - URL-driven routing for binder views — refresh on `/binder/:id?page=N` always restores the user's spot
 - Full multi-game support: Pokémon TCG, Magic: The Gathering (Scryfall), Yu-Gi-Oh! (YGOPRODeck), One Piece TCG (OPTCG)
 - Per-binder default game; mixed-game binders supported
@@ -25,11 +31,7 @@ The app is **live in production** at the project's Vercel domain. Anyone with th
 - Search history (localStorage), sort options, filters, pagination, 24-hr set cache, 15-min search cache
 - Toasts via react-hot-toast for write feedback
 - 5 background themes; currency picker (USD/EUR/GBP)
-- Security headers + SPA fallback rewrite in `vercel.json`
-- Vite SPA bundle: ~600KB gzipped (lazy-loaded routes for Stats / Sets / Settings)
-
-**Architectural pivot in flight:**
-- `feat/nextjs-migration` branch has the app rebuilt on **Next.js 16 (App Router) + `@supabase/ssr`** — cookie-based sessions, server-side validation in `src/proxy.js` on every request, no localStorage tokens. This eliminates the entire stale-JWT-empty-RLS class of bug we kept patching (Mistakes Log #15, #17, #18, #21, #23, #25-26). Awaiting user validation on a Vercel preview deploy before merging to `main`. See CLAUDE.md → "Architecture note" for details.
+- Security headers in `vercel.json`
 
 **Known limitations / debt:**
 - No tests (Vitest, Playwright) — Phase 5
@@ -193,10 +195,10 @@ The app is **live in production** at the project's Vercel domain. Anyone with th
 
 ## Phase 4 — Social & Sharing Features 🔲 Next up
 
-*Recommended order of operations: validate `feat/nextjs-migration` on Vercel preview → merge to `main` → start 4.1 on the Next.js base so public binder pages get proper SSR + OG tags out of the box.*
+*Now active. The Next.js base is on `main`, so public binder pages get proper SSR + OG tags out of the box.*
 
 ### 4.1 Public Profiles & Sharing
-- [x] React Router (URL-based navigation) — *already done in v0.4 (`/binder/:id`, `/stats`, `/sets`, `/settings`); Next.js App Router on the migration branch supersedes this*
+- [x] URL-based routing (Next.js App Router on `main`)
 - [ ] Add `is_public` boolean column to `binders` (and optionally `profiles`)
 - [ ] RLS: `SELECT` allowed on `binders WHERE is_public = true` for any role (anon + authenticated)
 - [ ] "Make public / copy share link" toggle on the binder edit screen
@@ -226,13 +228,10 @@ The app is **live in production** at the project's Vercel domain. Anyone with th
 *Some items shipped during the recent stability arc; rest pending.*
 
 ### 5.0 Architecture (NEW — pulled in from the auth-stability arc)
-- [x] **Supabase fetch hardening** — 15s timeout on every HTTP call via custom `global.fetch` (`src/supabase.js`), so no request can hang forever
+- [x] **Next.js 16 + `@supabase/ssr` migration** ✅ shipped to `main` 2026-05-01 — cookie-based sessions, server-side validation in `src/proxy.js` on every request, no localStorage tokens. Canonical fix for the stale-JWT class of bug
 - [x] **TanStack Query v5** for client-side server state (`src/hooks/queries.js`) — cache, optimistic updates, retry, refetch-on-focus/reconnect
-- [x] **401 retry interceptor** with single-flight refresh (`src/supabase.js#timeoutFetchWithAuthRetry`)
-- [x] **`ensureValidSession()` actually validates** — checks `expires_at` with 60s buffer and refreshes when needed
 - [x] **URL-driven view state** — refresh on `/binder/:id?page=N` always restores the user's spot
 - [x] **Database security/perf audit** — RLS optimisation (`SELECT auth.uid()` pattern), `collection_stats` view set to `SECURITY INVOKER`, dropped unused index + duplicate policy, tightened storage bucket listing (Mistakes Log #25-30)
-- [x] **`feat/nextjs-migration` branch ready** — Next.js 16 App Router + `@supabase/ssr` cookie-based sessions; awaiting user validation on a Vercel preview before merge to `main`. This is the canonical fix for the entire stale-JWT class of bug
 
 ### 5.1 Performance Optimization
 - [x] Lazy loading for heavy routes (`React.lazy` + `<Suspense>`) — Stats / Sets / Settings
@@ -279,20 +278,20 @@ The app is **live in production** at the project's Vercel domain. Anyone with th
 
 ## Tech Stack Summary
 
-| Layer | Current (`main`, v0.4) | On `feat/nextjs-migration` (awaiting validation) | Stretch (Phase 5) |
-|-------|------------------------|-----------------------------------------------|-------------------|
-| Framework | React 19 + Vite 7 | React 19 + Next.js 16 (App Router) | + TypeScript |
-| Server-state | TanStack Query v5 | TanStack Query v5 | — |
-| Authentication | Supabase Auth (email + Google), localStorage tokens | Supabase Auth via `@supabase/ssr`, **HttpOnly cookies**, server-side validation in `proxy.js` | + GitHub OAuth (skipped) |
-| Database | Supabase PostgreSQL, RLS enforced | (same) | + Postgres functions / views for stats |
-| File Storage | Supabase Storage (`binder-covers` public bucket) | (same) | + image transforms |
-| Card APIs | Pokemon TCG API + Scryfall (MTG) + YGOPRODeck + OPTCG | (same) | + price history |
-| Styling | Custom CSS (`src/App.css`, ~2k lines) | (same) | — |
-| Routing | `react-router-dom` v7 + `vercel.json` SPA fallback | App Router (server-side) | — |
-| Testing | None | None | Vitest + RTL + Playwright |
-| CI/CD | None | None | GitHub Actions |
-| Hosting | Vercel (Production: `main`; Preview: `dev`) | Vercel (Preview: `feat/nextjs-migration`) | — |
-| Monitoring | Vercel build logs only | (same) | Sentry + Plausible/GA |
+| Layer | Current (`main`, v0.5) | Stretch (Phase 5) |
+|-------|------------------------|-------------------|
+| Framework | React 19 + Next.js 16 (App Router) | + TypeScript |
+| Server-state | TanStack Query v5 | — |
+| Authentication | Supabase Auth via `@supabase/ssr` — **HttpOnly cookies**, server-side validation in `src/proxy.js` | + GitHub OAuth (skipped, not needed) |
+| Database | Supabase PostgreSQL, RLS enforced | + Postgres functions / views for stats |
+| File Storage | Supabase Storage (`binder-covers` public bucket) | + image transforms |
+| Card APIs | Pokemon TCG API + Scryfall (MTG) + YGOPRODeck + OPTCG | + price history |
+| Styling | Custom CSS (`src/App.css`, ~2k lines) | — |
+| Routing | Next.js App Router (server-side) | — |
+| Testing | None | Vitest + RTL + Playwright |
+| CI/CD | None | GitHub Actions |
+| Hosting | Vercel (Production: `main`; Preview: `dev`) | — |
+| Monitoring | Vercel build logs only | Sentry + Plausible/GA |
 
 ---
 
