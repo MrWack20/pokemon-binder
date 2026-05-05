@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { envHealth } from '@/lib/supabase/env';
+import { envHealth, browserEnvHealth } from '@/lib/supabase/env';
 import { Providers } from './providers';
 import './globals.css';
 
@@ -8,12 +8,22 @@ export const metadata = {
   description: 'Organize and showcase your TCG collection digitally.',
 };
 
+/**
+ * Renders a red banner if Supabase env vars are missing. Checks BOTH:
+ *   - The general envHealth (server-resolvable URL/key, used by SSR + proxy)
+ *   - The browser-specific NEXT_PUBLIC_* flags — because these are what the
+ *     client bundle actually reads. With only VITE_* set, server fetches
+ *     succeed but every browser fetch fails with "Failed to fetch" against
+ *     the placeholder URL.
+ */
 function EnvHealthBanner() {
-  if (envHealth.ok) return null;
+  if (envHealth.ok && browserEnvHealth.ok) return null;
+
   const missing = [
-    envHealth.urlMissing && 'SUPABASE_URL',
-    envHealth.keyMissing && 'SUPABASE_ANON_KEY',
+    browserEnvHealth.urlMissing && 'NEXT_PUBLIC_SUPABASE_URL',
+    browserEnvHealth.keyMissing && 'NEXT_PUBLIC_SUPABASE_ANON_KEY',
   ].filter(Boolean).join(', ');
+
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 10000,
@@ -22,8 +32,9 @@ function EnvHealthBanner() {
       borderBottom: '1px solid #ef4444',
     }}>
       <strong>Configuration error:</strong> Missing env var(s): <code>{missing}</code>.
-      {' '}On Vercel set <code>NEXT_PUBLIC_SUPABASE_URL</code> and{' '}
-      <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> for both Production AND Preview, then redeploy.
+      {' '}Set them under <strong>Vercel → Project Settings → Environment Variables</strong> for
+      both Production AND Preview, then <strong>redeploy</strong> (Next.js inlines these at build
+      time, so an existing deployment won&apos;t pick them up).
     </div>
   );
 }
