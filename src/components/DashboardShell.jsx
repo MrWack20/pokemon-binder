@@ -140,7 +140,10 @@ export default function DashboardShell() {
   const [inspectCard, setInspectCard] = useState(null);
 
   // ── Settings state ───────────────────────────────────────────────────────
-  const [appSettings, setAppSettings] = useState({ backgroundTheme: 'default' });
+  // Defaults must be stable for SSR. The real values from localStorage are
+  // hydrated in the effect below — never at render time, or React will see
+  // a different tree on the server vs the client and warn about a mismatch.
+  const [appSettings, setAppSettings] = useState({ backgroundTheme: 'default', currency: 'USD' });
 
   useEffect(() => {
     (async () => {
@@ -150,7 +153,13 @@ export default function DashboardShell() {
 
     try {
       const saved = localStorage.getItem('pokemonBinderSettings');
-      if (saved) setAppSettings(JSON.parse(saved));
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setAppSettings({
+          backgroundTheme: parsed.backgroundTheme || 'default',
+          currency: parsed.currency || 'USD',
+        });
+      }
     } catch { /* ignore */ }
   }, []);
 
@@ -347,10 +356,7 @@ export default function DashboardShell() {
     }
   };
 
-  const currency = (() => {
-    try { return JSON.parse(localStorage.getItem('pokemonBinderSettings') || '{}').currency || 'USD'; }
-    catch { return 'USD'; }
-  })();
+  const currency = appSettings.currency;
 
   return (
     <div className="app">
@@ -388,9 +394,16 @@ export default function DashboardShell() {
           )}
         </div>
 
-        {view === 'binders' && user && !profile && <PageLoader />}
+        {/* Loading: profile is still being fetched after sign-in */}
+        {!profile && user && <PageLoader />}
 
-        {view === 'binders' && profile && (
+        {/* Loading: profile loaded but the binder data for /binder/[id] hasn't
+            arrived yet. Without this we render a blank page during the fetch
+            window — the URL is set, but `selectedBinder` is null because
+            useBinders is mid-fetch or the binderId hasn't matched yet. */}
+        {profile && (view === 'binderView' || view === 'editBinder') && !selectedBinder && <PageLoader />}
+
+        {profile && view === 'binders' && (
           <BindersView
             profile={profile}
             binders={binders}

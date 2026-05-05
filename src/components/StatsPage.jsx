@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -57,8 +57,15 @@ export default function StatsPage() {
   const router = useRouter();
   const { data: stats, isLoading: loading, error } = useCollectionStats(profile?.id);
 
-  const savedSettings = (() => { try { return JSON.parse(localStorage.getItem('pokemonBinderSettings') || '{}'); } catch { return {}; } })();
-  const currency = savedSettings.currency || 'USD';
+  // Default to USD on SSR; rehydrate from localStorage on the client.
+  // Reading at render time would make the server and client trees disagree.
+  const [currency, setCurrency] = useState('USD');
+  useEffect(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('pokemonBinderSettings') || '{}');
+      if (parsed.currency) setCurrency(parsed.currency);
+    } catch { /* ignore */ }
+  }, []);
   const symbol = CURRENCY_SYMBOL[currency] || '$';
 
   return (

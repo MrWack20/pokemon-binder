@@ -11,11 +11,6 @@ import { useOwnedApiIds } from '@/hooks/queries';
 import { useAuth } from '@/contexts/AuthContext';
 import CardDetailModal from './CardDetailModal.jsx';
 
-function getStoredCurrency() {
-  try { return JSON.parse(localStorage.getItem('pokemonBinderSettings') || '{}').currency || 'USD'; }
-  catch { return 'USD'; }
-}
-
 const CURRENCY_SYMBOL = { USD: '$', EUR: '€', GBP: '£' };
 
 const GAME_TABS = [
@@ -28,7 +23,14 @@ const GAME_TABS = [
 export default function SetsPage() {
   const router = useRouter();
   const { profile } = useAuth();
-  const currency = getStoredCurrency();
+  // Default to USD on SSR; rehydrate from localStorage on the client.
+  const [currency, setCurrency] = useState('USD');
+  useEffect(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('pokemonBinderSettings') || '{}');
+      if (parsed.currency) setCurrency(parsed.currency);
+    } catch { /* ignore */ }
+  }, []);
   const symbol = CURRENCY_SYMBOL[currency] || '$';
 
   const [activeGame, setActiveGame] = useState('pokemon');
