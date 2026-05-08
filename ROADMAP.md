@@ -237,16 +237,20 @@ The app is **live in production** at the project's Vercel domain. Anyone with th
 - [x] **URL-driven view state** — refresh on `/binder/:id?page=N` always restores the user's spot
 - [x] **Database security/perf audit** — RLS optimisation (`SELECT auth.uid()` pattern), `collection_stats` view set to `SECURITY INVOKER`, dropped unused index + duplicate policy, tightened storage bucket listing (Mistakes Log #25-30)
 
-### 5.1 Performance Optimization
+### 5.1 Performance Optimization 🚧 In progress
 - [x] Lazy loading for heavy routes (`React.lazy` + `<Suspense>`) — Stats / Sets / Settings
 - [x] Search request caching (15-min TTL, 60-entry cap)
 - [x] Set list cached for 24 hr
 - [x] Database indexes on hot paths (added during recent perf audit)
-- [ ] Image optimization (WebP, Supabase Storage transforms)
+- [x] **Search debouncing** — BinderView's auto-search debounce tightened from 500ms → 300ms (industry-standard "feels-instant" window)
+- [x] **Loading skeletons** for SetsPage card grids — shimmer-animated card-shaped placeholders replace the spinner during set-card pagination (1-3s for big sets)
+- [x] **Image rendering polish** — every high-volume `<img>` gains `decoding="async"` so the browser decodes off the main thread; combined with existing `loading="lazy"` this cuts scroll jank on 250+ card pages
+- [x] **Bundle analyzer wired** (`@next/bundle-analyzer`) — run `ANALYZE=true npm run build` to inspect chunk graph at `.next/analyze/*.html`
+- [x] **Web Vitals reporting** (`web-vitals` package) — LCP / INP / CLS / FCP / TTFB logged to the browser console with rating, dynamically imported so it stays out of the initial bundle (~5KB)
+- [ ] Image optimization (WebP via Supabase Storage transforms; would replace `unoptimized: true` in `next.config.js`)
 - [ ] Virtual scrolling for large search results (`react-window` / `react-virtuoso`)
 - [ ] Service worker / PWA for offline support
-- [ ] Search autocomplete with debouncing
-- [ ] Server-side aggregations via Supabase database functions (currently aggregated client-side)
+- [ ] Server-side aggregations via Supabase database functions (currently aggregated client-side; biggest win for Stats page on large collections)
 
 ### 5.2 Testing 🔲
 - [ ] Unit tests (Vitest + React Testing Library)

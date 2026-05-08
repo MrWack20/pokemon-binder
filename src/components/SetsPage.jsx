@@ -14,6 +14,24 @@ import CardDetailModal from './CardDetailModal.jsx';
 
 const CURRENCY_SYMBOL = { USD: '$', EUR: '€', GBP: '£' };
 
+// ── Skeleton placeholder ─────────────────────────────────────────────────────
+// Renders a grid of empty card-shaped placeholders while a set's full card
+// list streams in. Big modern Pokemon sets paginate over 2-3 API calls
+// (250-card max per request), so this state can last 1-3 seconds.
+function CardGridSkeleton({ count = 12 }) {
+  return (
+    <div className="sets-card-grid">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="card-skeleton" aria-hidden="true">
+          <div className="card-skeleton__img" />
+          <div className="card-skeleton__name" />
+          <div className="card-skeleton__meta" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const GAME_TABS = [
   { id: 'pokemon',  label: '🎴 Pokémon',   hasSetBrowser: true  },
   { id: 'mtg',      label: '⚔️ MTG',       hasSetBrowser: false },
@@ -370,10 +388,7 @@ export default function SetsPage() {
               </div>
 
               {loadingCards ? (
-                <div className="stats-loading">
-                  <RefreshCw size={32} className="spinning" />
-                  <p>Loading {selectedSet.printedTotal ?? selectedSet.total} cards…</p>
-                </div>
+                <CardGridSkeleton count={Math.min(selectedSet.printedTotal ?? selectedSet.total ?? 12, 24)} />
               ) : (
                 <div className="sets-card-grid">
                   {cards.map(card => {
@@ -396,7 +411,7 @@ export default function SetsPage() {
                         >
                           <Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />
                         </button>
-                        <img src={card.images.small} alt={card.name} loading="lazy" />
+                        <img src={card.images.small} alt={card.name} loading="lazy" decoding="async" />
                         <p className="sets-browse-card__name">{card.name}</p>
                         <p className="sets-browse-card__number">#{card.number}</p>
                         {price != null
@@ -478,7 +493,7 @@ export default function SetsPage() {
                           >
                             <Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />
                           </button>
-                          <img src={card.images?.small || card.images?.large} alt={card.name} loading="lazy" />
+                          <img src={card.images?.small || card.images?.large} alt={card.name} loading="lazy" decoding="async" />
                           <p className="sets-browse-card__name">{card.name}</p>
                           {card.set?.name && <p className="sets-browse-card__number">{card.set.name}</p>}
                           {card._price != null
@@ -585,10 +600,7 @@ export default function SetsPage() {
               </div>
 
               {loadingOpCards ? (
-                <div className="stats-loading">
-                  <RefreshCw size={32} className="spinning" />
-                  <p>Loading cards…</p>
-                </div>
+                <CardGridSkeleton count={18} />
               ) : opCards.length === 0 ? (
                 <p style={{ textAlign: 'center', padding: '40px 0', opacity: 0.5 }}>No cards found in this set.</p>
               ) : (
@@ -610,7 +622,7 @@ export default function SetsPage() {
                           <Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />
                         </button>
                         {card.images?.small
-                          ? <img src={card.images.small} alt={card.name} loading="lazy" />
+                          ? <img src={card.images.small} alt={card.name} loading="lazy" decoding="async" />
                           : <div style={{ width: '100%', aspectRatio: '2.5/3.5', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Layers size={24} style={{ opacity: 0.3 }} /></div>
                         }
                         <p className="sets-browse-card__name">{card.name}</p>

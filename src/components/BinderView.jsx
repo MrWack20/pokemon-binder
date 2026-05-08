@@ -196,7 +196,7 @@ function CardSlot({ absoluteIndex, card, isSelected, onSelectCell, onRemoveCard,
       {card ? (
         <div className="card-container">
           <GripVertical size={16} className="drag-handle" />
-          <img src={card.card_image_url} alt={card.card_name} loading="lazy" />
+          <img src={card.card_image_url} alt={card.card_name} loading="lazy" decoding="async" />
           <button
             onClick={(e) => { e.stopPropagation(); onRemoveCard(absoluteIndex); }}
             className="remove-btn"
@@ -326,10 +326,13 @@ export default function BinderView({
   const filtersRef = useRef(searchFilters);
   useEffect(() => { filtersRef.current = searchFilters; });
 
-  // Auto-search after 500 ms when user types 3+ characters
+  // Auto-search after 300 ms when user types 3+ characters. 300ms is the
+  // industry-standard "feels-instant" debounce; 500ms used to feel laggy.
+  // Cleanup cancels the pending fire if the user keeps typing — only the
+  // final keystroke after the pause triggers the API call.
   useEffect(() => {
     if (!searchIsOpen || !searchQuery.trim() || searchQuery.trim().length < 3) return;
-    const t = setTimeout(() => onSearch(searchQuery, filtersRef.current, 1), 500);
+    const t = setTimeout(() => onSearch(searchQuery, filtersRef.current, 1), 300);
     return () => clearTimeout(t);
   }, [searchQuery, searchIsOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -741,7 +744,7 @@ export default function BinderView({
                         <Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />
                       </button>
                     )}
-                    <img src={card.images.small} alt={card.name} loading="lazy" />
+                    <img src={card.images.small} alt={card.name} loading="lazy" decoding="async" />
                     <p>{card.name}</p>
                     <p className="text-muted" style={{ fontSize: '0.7rem', marginBottom: '4px' }}>{card.set.name}</p>
                     {p != null ? <p className="price">${p.toFixed(2)}</p> : null}

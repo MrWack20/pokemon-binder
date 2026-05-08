@@ -178,7 +178,7 @@ export default function WishlistPage() {
                       <img
                         src={item.card_image_url}
                         alt={item.card_name}
-                        loading="lazy"
+                        loading="lazy" decoding="async"
                         className="wishlist-item__img"
                       />
                     ) : (

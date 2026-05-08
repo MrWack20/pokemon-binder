@@ -110,7 +110,7 @@ export default function PublicBinderView({ binder, ownerName, currency = 'USD' }
                 <img
                   src={card.card_image_url}
                   alt={card.card_name}
-                  loading="lazy"
+                  loading="lazy" decoding="async"
                   style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                 />
               ) : (
