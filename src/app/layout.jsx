@@ -1,3 +1,4 @@
+import NextTopLoader from 'nextjs-toploader';
 import { createClient } from '@/lib/supabase/server';
 import { envHealth, browserEnvHealth } from '@/lib/supabase/env';
 import { Providers } from './providers';
@@ -50,6 +51,16 @@ export default async function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
+        {/* Top progress bar — gives instant visual ack on every <Link>
+            click so even a sub-100ms route change feels intentional.
+            Brand-yellow, no spinner (showSpinner: false), 200ms initial
+            delay so we don't flicker on truly instant nav. */}
+        <NextTopLoader
+          color="#fbbf24"
+          height={3}
+          showSpinner={false}
+          shadow="0 0 10px #fbbf24, 0 0 5px #fbbf24"
+        />
         <EnvHealthBanner />
         <Providers initialUser={user}>{children}</Providers>
       </body>

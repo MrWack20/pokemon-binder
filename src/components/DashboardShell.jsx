@@ -7,6 +7,7 @@ import { useIsMutating } from '@tanstack/react-query';
 import { Book, RefreshCw, Layers, BarChart2, Heart } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { createClient } from '@/lib/supabase/client';
+import { withViewTransition } from '@/lib/viewTransition';
 import { BACKGROUND_THEMES } from '@/constants/themes';
 import CardDetailModal from '@/components/CardDetailModal';
 import CardInspectModal from '@/components/CardInspectModal';
@@ -91,7 +92,13 @@ export default function DashboardShell() {
     if (value > 0) sp.set('page', String(value));
     else sp.delete('page');
     const qs = sp.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    // Wrap in startViewTransition so Chromium/Safari animate the cross-
+    // fade between the old and new card grid. Browsers without support
+    // (Firefox today) just run the state change immediately — same as
+    // before, no regression.
+    withViewTransition(() => {
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    });
   };
 
   // ── Server state via React Query ─────────────────────────────────────────

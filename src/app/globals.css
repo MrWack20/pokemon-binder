@@ -2467,3 +2467,25 @@ input[type="number"].input::-webkit-outer-spin-button {
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.05);
 }
+
+/* ── View Transitions tuning (Phase 5.1 perf) ────────────────────────────── */
+/* Chromium/Safari default cross-fade is ~250ms. We slow it slightly to
+   180ms — fast enough to feel instant, slow enough that the eye registers
+   "something changed intentionally" rather than a snap. The :root
+   pseudo-element targets the entire page transition. */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 180ms;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* Respect user accessibility preference — no animation if they've asked
+   for reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}
