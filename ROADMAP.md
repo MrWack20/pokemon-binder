@@ -217,6 +217,15 @@ The app is **live in production** at the project's Vercel domain. Anyone with th
 
 **Trading feature dropped (2026-05-08):** the original 4.2 scope included a `trade_list` table, "have/want" matching with other users, and Realtime notifications. The product direction shifted toward "personal collection tracker, optionally shared," not a trading marketplace — so the trading half is out of scope. Wishlist alone covers what users actually wanted (a private list of cards they're hunting).
 
+### 4.4 Community gallery + TCG news ✅ Complete
+*Two home-page surfaces that turn the dashboard into a discovery space.*
+
+- [x] **Public binders gallery** on the home page — `usePublicBinders()` hook reads recently-shared public binders via the existing `binders_public_select` RLS policy (works for anon + authenticated). Each card links to the existing `/share/[binderId]` route. Quietly hides the section when no public binders exist (fresh project).
+- [x] **TCG news feed** with curated RSS aggregation (`/api/news` Route Handler) — Pokémon (PokéBeach), MTG (Wizards official), Yu-Gi-Oh! (YGOrganization). Fan-out fetch + Promise.allSettled so one slow source doesn't block; `revalidate: 1800` so each upstream feed is hit at most twice an hour total. Items merged + sorted by date, capped at 12.
+- [x] **Credibility via curation, not heuristics** — the SOURCES allowlist in `/api/news/route.js` is the trust boundary. Adding a source is a one-line PR; dropping a degraded source is the same. No third-party news SDK, no scraping, no robots.txt risk.
+- [x] **News UI** with per-game tab filter (All / Pokémon / MTG / Yu-Gi-Oh / One Piece — only games with present items show as tabs). Each card opens the original article in a new tab (`target=_blank rel=noopener noreferrer`); we never re-host publisher content.
+- [x] **Refreshed default background** — replaced the vibrant blue → purple → pink gradient with a professional dark slate (Linear/Vercel-style): two soft radial accents (warm yellow top-left, cool blue bottom-right) over a near-black `#0f172a → #020617` linear gradient. Both `BACKGROUND_THEMES.default` and the `body` SSR fallback updated so first paint matches.
+
 ### 4.3 Import / Export 🚧 In progress
 - [x] Export single binder as **CSV** or **JSON** — dropdown menu on the BinderView header (next to Edit Cover). Pure client-side via `src/lib/export.js` (Blob + temporary `<a download>`); skips empty slots; sanitises filenames; CSV is fully quoted so commas/quotes inside card names don't break parsing.
 - [x] Export the **whole collection** as CSV or JSON — buttons on Settings → Export collection. Single Supabase query with FK-embedded `binder_cards`, then formatted by the same `src/lib/export.js` helpers (CSV prefixes a `binder_name` column).

@@ -14,6 +14,8 @@ import CardInspectModal from '@/components/CardInspectModal';
 import BindersView from '@/components/BindersView';
 import EditBinderCover from '@/components/EditBinderCover';
 import BinderView from '@/components/BinderView';
+import NewsSection from '@/components/NewsSection';
+import CommunityBindersSection from '@/components/CommunityBindersSection';
 import UserMenu from '@/components/Auth/UserMenu';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -491,14 +493,21 @@ export default function DashboardShell() {
         {profile && (view === 'binderView' || view === 'editBinder') && !selectedBinder && <PageLoader />}
 
         {profile && view === 'binders' && (
-          <BindersView
-            profile={profile}
-            binders={binders}
-            onCreateBinder={handleCreateBinder}
-            onSelectBinder={handleSelectBinder}
-            onDeleteBinder={handleDeleteBinder}
-            onDuplicateBinder={handleDuplicateBinder}
-          />
+          <>
+            <BindersView
+              profile={profile}
+              binders={binders}
+              onCreateBinder={handleCreateBinder}
+              onSelectBinder={handleSelectBinder}
+              onDeleteBinder={handleDeleteBinder}
+              onDuplicateBinder={handleDuplicateBinder}
+            />
+            {/* Community + news sections only render on the home view.
+                Each component handles its own loading + empty states and
+                quietly hides itself when there's nothing to show. */}
+            <CommunityBindersSection />
+            <NewsSection />
+          </>
         )}
 
         {view === 'binderView' && selectedBinder && (

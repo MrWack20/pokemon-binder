@@ -14,6 +14,9 @@ export const qk = {
   stats:          (profileId) => ['stats', profileId],
   wishlist:       (profileId) => ['wishlist', profileId],
   wishlistedKeys: (profileId) => ['wishlisted-keys', profileId],
+  // Public, no profile scope:
+  publicBinders:  () => ['public-binders'],
+  news:           () => ['news'],
 };
 
 // Service functions return { data, error } — throw on error so React Query
@@ -352,5 +355,55 @@ export function useUpdateWishlistItem() {
     onSuccess: (_data, { profileId }) => {
       if (profileId) qc.invalidateQueries({ queryKey: qk.wishlist(profileId) });
     },
+  });
+}
+
+// ─── Public binders gallery (Phase 4 community) ─────────────────────────────
+//
+// Reads via the browser Supabase client. RLS policy `binders_public_select`
+// permits anon + authenticated to read rows where is_public = true, so this
+// works the same whether the visitor is signed in or not.
+//
+// Limited to 12 most-recent so the home-page gallery stays compact. The
+// owner display name comes via the FK-embedded `profiles` join, gated by
+// the SECURITY-DEFINER-backed `profiles_public_select` policy.
+export function usePublicBinders(limit = 12) {
+  return useQuery({
+    queryKey: qk.publicBinders(),
+    queryFn: async () => {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('binders')
+        .select(`
+          id, name, rows, cols, pages, cover_color, cover_text, cover_image_url, created_at, profile_id,
+          binder_cards(count),
+          profiles!inner(id, name, avatar_url)
+        `)
+        .eq('is_public', true)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data || [];
+    },
+    // Public gallery doesn't need second-by-second freshness.
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ─── TCG news feed (Phase 4 community) ──────────────────────────────────────
+//
+// Hits our /api/news route which aggregates RSS from a curated source list.
+// The route itself caches with revalidate: 1800 (30 min) so concurrent users
+// hit Vercel's edge cache, not the upstream feeds.
+export function useTcgNews() {
+  return useQuery({
+    queryKey: qk.news(),
+    queryFn: async () => {
+      const res = await fetch('/api/news');
+      if (!res.ok) throw new Error(`news fetch failed: ${res.status}`);
+      return res.json();
+    },
+    staleTime: 10 * 60 * 1000, // 10 min on the client; server cache handles the rest
   });
 }

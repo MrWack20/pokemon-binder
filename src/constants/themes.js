@@ -3,7 +3,12 @@ export const BACKGROUND_THEMES = {
   // ── Neutral ────────────────────────────────────────────────────────────────
   default: {
     name: 'Default (Dark)',
-    css: 'linear-gradient(160deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%)',
+    // Layered: a soft warm glow at the top-left (the brand yellow at 8%
+    // opacity over a near-black slate), gradient-ing into deep navy at
+    // the bottom-right. Looks like Linear/Vercel/Stripe — quiet, modern,
+    // not screaming colour at you. The double radial keeps the visible
+    // area away from a hard horizon line.
+    css: 'radial-gradient(ellipse 80% 60% at 15% 0%, rgba(251,191,36,0.06) 0%, rgba(251,191,36,0) 70%), radial-gradient(ellipse 90% 70% at 85% 100%, rgba(59,130,246,0.07) 0%, rgba(59,130,246,0) 70%), linear-gradient(180deg, #0f172a 0%, #020617 100%)',
   },
 
   // ── Poké Balls ─────────────────────────────────────────────────────────────
