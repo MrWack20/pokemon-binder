@@ -156,7 +156,12 @@ function sortSetCards(cards, sort) {
 }
 
 /**
- * Fetch ALL cards for a set (up to 250 per request, covers virtually all sets).
+ * Fetch ALL cards for a set, paginating across however many pages the API
+ * has. The Pokemon TCG API caps pageSize at 250, so modern sets with 250+
+ * cards (Surging Sparks, Prismatic Evolutions, etc.) used to be silently
+ * truncated. Now we read `totalCount` from page 1 and fetch the rest in
+ * parallel.
+ *
  * Results are cached in localStorage for 15 minutes per set+sort combo.
  */
 export async function getSetCards(setId, sort = 'number') {
@@ -170,12 +175,35 @@ export async function getSetCards(setId, sort = 'number') {
   } catch { /* ignore */ }
 
   try {
-    // Fetch up to 250; sort by number at API level for initial order
-    const url = `${BASE_URL}/cards?q=${encodeURIComponent(`set.id:${setId}`)}&pageSize=250&orderBy=number`;
-    const res = await fetch(url, { headers: getHeaders() });
-    if (!res.ok) throw new Error(`TCG API ${res.status}`);
-    const json = await res.json();
-    const cards = sortSetCards(json.data || [], sort);
+    const PAGE_SIZE = 250;
+    const baseUrl = `${BASE_URL}/cards?q=${encodeURIComponent(`set.id:${setId}`)}&orderBy=number&pageSize=${PAGE_SIZE}`;
+
+    // Fetch page 1 to discover totalCount.
+    const res1 = await fetch(`${baseUrl}&page=1`, { headers: getHeaders() });
+    if (!res1.ok) throw new Error(`TCG API ${res1.status}`);
+    const json1 = await res1.json();
+    const totalCount = Number(json1.totalCount ?? 0);
+    let cards = json1.data || [];
+
+    // Fan out remaining pages concurrently. This is a bounded concurrent
+    // operation — most sets are 1 page, modern ones are 2-3, nothing on
+    // record exceeds ~7. No backoff needed.
+    if (totalCount > PAGE_SIZE) {
+      const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+      const requests = [];
+      for (let p = 2; p <= totalPages; p++) {
+        requests.push(
+          fetch(`${baseUrl}&page=${p}`, { headers: getHeaders() })
+            .then(r => (r.ok ? r.json() : { data: [] }))
+            .then(j => j.data || [])
+            .catch(() => [])
+        );
+      }
+      const morePages = await Promise.all(requests);
+      cards = cards.concat(...morePages);
+    }
+
+    cards = sortSetCards(cards, sort);
     try { localStorage.setItem(cacheKey, JSON.stringify({ data: cards, ts: Date.now() })); } catch { /* storage full */ }
     return { data: cards, error: null };
   } catch (err) {

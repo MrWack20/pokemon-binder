@@ -212,6 +212,7 @@ The app is **live in production** at the project's Vercel domain. Anyone with th
 - [x] `/wishlist` page (`src/app/wishlist/page.jsx` + `components/WishlistPage.jsx`) — grouped by game, filters by name and game, priority star toggle, total-value summary, currency-aware. Empty/loading/error states all covered.
 - [x] Heart-toggle button on card search results in `BinderView` — instant optimistic update via React Query, single click adds, click again removes. Hooks: `useWishlist`, `useWishlistedKeys`, `useAddToWishlist`, `useRemoveFromWishlist`, `useUpdateWishlistItem`.
 - [x] Wishlist link added to header nav (alongside Browse Sets / Statistics).
+- [x] Heart-toggle button extended to **all three card grids in `SetsPage`** (Pokemon set view, MTG/YGO search results, One Piece set view) — same optimistic React Query flow, one shared handler.
 - [ ] "Have / Want" indicator on card search results — currently shows "wishlisted" only; need an "owned" badge cross-referencing `binder_cards` (already have `useOwnedApiIds` from SetsPage; just need to surface in BinderView's search panel).
 - [ ] `trade_list` table (cards willing to trade) — *deferred to 4.2 polish round*.
 - [ ] (Stretch) Notify when another user owns a card you want — Supabase Edge Functions + Realtime *— deferred*.

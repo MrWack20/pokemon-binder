@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Search, X, RefreshCw, Layers, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Search, X, RefreshCw, Layers, AlertCircle, CheckCircle2, Heart } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { getSets, getSetCards } from '@/services/searchService';
-import { searchMtgCards } from '@/services/mtgService';
-import { searchYgoCards } from '@/services/yugiohService';
-import { getOpSets, getOpSetCards } from '@/services/onepieceService';
-import { useOwnedApiIds } from '@/hooks/queries';
+import { searchMtgCards, mtgCardToDbRow } from '@/services/mtgService';
+import { searchYgoCards, ygoCardToDbRow } from '@/services/yugiohService';
+import { getOpSets, getOpSetCards, opCardToDbRow } from '@/services/onepieceService';
+import { useOwnedApiIds, useWishlistedKeys, useAddToWishlist, useRemoveFromWishlist } from '@/hooks/queries';
 import { useAuth } from '@/contexts/AuthContext';
 import CardDetailModal from './CardDetailModal.jsx';
 
@@ -62,7 +63,59 @@ export default function SetsPage() {
 
   // Ownership tracking — query auto-refetches on focus/reconnect.
   const { data: ownedIds = new Set() } = useOwnedApiIds(profile?.id);
+  const { data: wishlistedKeys = new Set() } = useWishlistedKeys(profile?.id);
+  const addWishlistMut = useAddToWishlist();
+  const removeWishlistMut = useRemoveFromWishlist();
   const [modalCard, setModalCard] = useState(null);
+
+  // Toggle a card on/off the wishlist. Used by all 3 card grids
+  // (Pokemon, MTG/YGO search, One Piece). The card shape from each API
+  // already carries `_game`, so the per-game DB-row mappers do the rest.
+  const handleToggleWishlist = useCallback(async (apiCard) => {
+    if (!profile?.id) return;
+    const game = apiCard._game ?? 'pokemon';
+    const isWishlisted = wishlistedKeys.has(`${apiCard.id}::${game}`);
+
+    if (isWishlisted) {
+      try {
+        await removeWishlistMut.mutateAsync({
+          profileId: profile.id,
+          cardApiId: apiCard.id,
+          cardGame: game,
+        });
+        toast.success(`Removed ${apiCard.name} from wishlist`);
+      } catch {
+        toast.error('Failed to update wishlist.');
+      }
+      return;
+    }
+
+    let cardData;
+    if (game === 'mtg') cardData = mtgCardToDbRow(apiCard);
+    else if (game === 'yugioh') cardData = ygoCardToDbRow(apiCard);
+    else if (game === 'onepiece') cardData = opCardToDbRow(apiCard);
+    else cardData = {
+      card_api_id: apiCard.id,
+      card_name: apiCard.name,
+      card_image_url: apiCard.images?.small ?? apiCard.images?.large ?? '',
+      card_set: apiCard.set?.name ?? null,
+      card_game: 'pokemon',
+      card_price: apiCard._price
+        ?? apiCard.tcgplayer?.prices?.holofoil?.market
+        ?? apiCard.tcgplayer?.prices?.normal?.market
+        ?? apiCard.tcgplayer?.prices?.['1stEditionHolofoil']?.market
+        ?? apiCard.tcgplayer?.prices?.unlimited?.market
+        ?? null,
+      card_price_currency: 'USD',
+    };
+
+    try {
+      await addWishlistMut.mutateAsync({ profileId: profile.id, cardData });
+      toast.success(`Added ${apiCard.name} to wishlist`);
+    } catch {
+      toast.error('Failed to add to wishlist.');
+    }
+  }, [profile?.id, wishlistedKeys, addWishlistMut, removeWishlistMut]);
 
   // ── Load Pokémon sets on mount ──────────────────────────────────────────
   useEffect(() => {
@@ -329,9 +382,20 @@ export default function SetsPage() {
                       ?? card.tcgplayer?.prices?.['1stEditionHolofoil']?.market
                       ?? card.tcgplayer?.prices?.unlimited?.market;
                     const owned = ownedIds.has(card.id);
+                    const cardGame = card._game ?? 'pokemon';
+                    const isWishlisted = wishlistedKeys.has(`${card.id}::${cardGame}`);
                     return (
                       <div key={card.id} className={`sets-browse-card${owned ? ' sets-browse-card--owned' : ''}`} onClick={() => setModalCard(card)}>
                         {owned && <span className="sets-browse-card__owned-badge"><CheckCircle2 size={12} />Owned</span>}
+                        <button
+                          type="button"
+                          className={`search-card__wishlist-btn${isWishlisted ? ' is-active' : ''}`}
+                          title={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                          aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                          onClick={(e) => { e.stopPropagation(); handleToggleWishlist(card); }}
+                        >
+                          <Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />
+                        </button>
                         <img src={card.images.small} alt={card.name} loading="lazy" />
                         <p className="sets-browse-card__name">{card.name}</p>
                         <p className="sets-browse-card__number">#{card.number}</p>
@@ -400,9 +464,20 @@ export default function SetsPage() {
                   <div className="sets-card-grid">
                     {searchResults.map(card => {
                       const owned = ownedIds.has(card.id);
+                      const cardGame = card._game ?? activeGame ?? 'pokemon';
+                      const isWishlisted = wishlistedKeys.has(`${card.id}::${cardGame}`);
                       return (
                         <div key={card.id} className={`sets-browse-card${owned ? ' sets-browse-card--owned' : ''}`} onClick={() => setModalCard(card)}>
                           {owned && <span className="sets-browse-card__owned-badge"><CheckCircle2 size={12} />Owned</span>}
+                          <button
+                            type="button"
+                            className={`search-card__wishlist-btn${isWishlisted ? ' is-active' : ''}`}
+                            title={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                            aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                            onClick={(e) => { e.stopPropagation(); handleToggleWishlist(card); }}
+                          >
+                            <Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />
+                          </button>
                           <img src={card.images?.small || card.images?.large} alt={card.name} loading="lazy" />
                           <p className="sets-browse-card__name">{card.name}</p>
                           {card.set?.name && <p className="sets-browse-card__number">{card.set.name}</p>}
@@ -520,9 +595,20 @@ export default function SetsPage() {
                 <div className="sets-card-grid">
                   {opCards.map(card => {
                     const owned = ownedIds.has(card.id);
+                    const cardGame = card._game ?? 'onepiece';
+                    const isWishlisted = wishlistedKeys.has(`${card.id}::${cardGame}`);
                     return (
                       <div key={card.id} className={`sets-browse-card${owned ? ' sets-browse-card--owned' : ''}`} onClick={() => setModalCard(card)}>
                         {owned && <span className="sets-browse-card__owned-badge"><CheckCircle2 size={12} />Owned</span>}
+                        <button
+                          type="button"
+                          className={`search-card__wishlist-btn${isWishlisted ? ' is-active' : ''}`}
+                          title={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                          aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                          onClick={(e) => { e.stopPropagation(); handleToggleWishlist(card); }}
+                        >
+                          <Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />
+                        </button>
                         {card.images?.small
                           ? <img src={card.images.small} alt={card.name} loading="lazy" />
                           : <div style={{ width: '100%', aspectRatio: '2.5/3.5', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Layers size={24} style={{ opacity: 0.3 }} /></div>
