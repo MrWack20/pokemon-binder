@@ -3,14 +3,86 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Edit2, ChevronLeft, ChevronRight, Filter, X, Search,
-  Plus, GripVertical, SortAsc, Clock, LayoutGrid, Columns, Images, Maximize2, Heart,
+  Plus, GripVertical, SortAsc, Clock, LayoutGrid, Columns, Images, Maximize2, Heart, CheckCircle2,
+  Download, FileText, FileJson,
 } from 'lucide-react';
+import { exportBinderCsv, exportBinderJson } from '../lib/export.js';
 import { getRecentSearches } from '../services/searchService.js';
 import {
   DndContext, DragOverlay, closestCenter,
   PointerSensor, TouchSensor, useSensor, useSensors,
 } from '@dnd-kit/core';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
+
+// ─── Export menu (CSV / JSON) ─────────────────────────────────────────────────
+//
+// Tiny dropdown next to "Edit Cover". Two formats — CSV for spreadsheet
+// users, JSON for re-import into another PokéBinder instance later. Pure
+// client-side; no Supabase round-trip needed (the binder + cards are
+// already in memory by the time this menu opens).
+
+function ExportMenu({ binder }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  // Close on outside click / Escape.
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    function onKey(e) { if (e.key === 'Escape') setOpen(false); }
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const filledCount = (binder.cards || []).filter(c => c && c.id).length;
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        className="btn btn-secondary"
+        onClick={() => setOpen(o => !o)}
+        title="Export this binder"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <Download size={18} />Export
+      </button>
+      {open && (
+        <div className="export-menu" role="menu">
+          <button
+            role="menuitem"
+            className="export-menu__item"
+            onClick={() => { exportBinderCsv(binder); setOpen(false); }}
+          >
+            <FileText size={16} />
+            <span>
+              Export as CSV
+              <span className="export-menu__hint">{filledCount} card{filledCount !== 1 ? 's' : ''}, spreadsheet-friendly</span>
+            </span>
+          </button>
+          <button
+            role="menuitem"
+            className="export-menu__item"
+            onClick={() => { exportBinderJson(binder); setOpen(false); }}
+          >
+            <FileJson size={16} />
+            <span>
+              Export as JSON
+              <span className="export-menu__hint">includes binder layout for re-import</span>
+            </span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── Card slot ────────────────────────────────────────────────────────────────
 
@@ -144,6 +216,11 @@ export default function BinderView({
   // Wishlist (Phase 4.2): a Set<"<api_id>::<game>"> + a single toggle
   // callback. Both optional so the component still works on /share pages.
   wishlistedKeys, onToggleWishlist,
+  // Owned-card cross-reference (Phase 4.2 polish): a Set<card_api_id> of
+  // every card already in any of this user's binders. Drives the small
+  // "Owned" check badge on search results so the Have/Want signal is
+  // visible at a glance.
+  ownedApiIds,
 }) {
   const slotsPerPage  = binder.rows * binder.cols;
   const totalPages    = binder.pages;
@@ -263,6 +340,7 @@ export default function BinderView({
             {searchIsOpen ? <X size={18} /> : <Search size={18} />}
             {searchIsOpen ? 'Close' : 'Add Card'}
           </button>
+          <ExportMenu binder={binder} />
           <button className="btn btn-primary" onClick={onEditCover}>
             <Edit2 size={18} />Edit Cover
           </button>
@@ -593,8 +671,14 @@ export default function BinderView({
                 const cardGame = card._game ?? 'pokemon';
                 const wishlistKey = `${card.id}::${cardGame}`;
                 const isWishlisted = wishlistedKeys?.has(wishlistKey) ?? false;
+                const isOwned = ownedApiIds?.has(card.id) ?? false;
                 return (
-                  <div key={card.id} onClick={() => onAddCard(card)} className="search-card">
+                  <div key={card.id} onClick={() => onAddCard(card)} className={`search-card${isOwned ? ' search-card--owned' : ''}`}>
+                    {isOwned && (
+                      <span className="search-card__owned-badge" aria-label="Already in your collection">
+                        <CheckCircle2 size={12} />Owned
+                      </span>
+                    )}
                     {onToggleWishlist && (
                       <button
                         type="button"

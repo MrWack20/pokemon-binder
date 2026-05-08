@@ -213,14 +213,15 @@ The app is **live in production** at the project's Vercel domain. Anyone with th
 - [x] Heart-toggle button on card search results in `BinderView` — instant optimistic update via React Query, single click adds, click again removes. Hooks: `useWishlist`, `useWishlistedKeys`, `useAddToWishlist`, `useRemoveFromWishlist`, `useUpdateWishlistItem`.
 - [x] Wishlist link added to header nav (alongside Browse Sets / Statistics).
 - [x] Heart-toggle button extended to **all three card grids in `SetsPage`** (Pokemon set view, MTG/YGO search results, One Piece set view) — same optimistic React Query flow, one shared handler.
-- [ ] "Have / Want" indicator on card search results — currently shows "wishlisted" only; need an "owned" badge cross-referencing `binder_cards` (already have `useOwnedApiIds` from SetsPage; just need to surface in BinderView's search panel).
+- [x] **Have/Want indicator** on BinderView search results — owned-badge (top-left, green) sits alongside the wishlist heart (top-right, red), driven by `useOwnedApiIds` cross-reference with `binder_cards`.
 - [ ] `trade_list` table (cards willing to trade) — *deferred to 4.2 polish round*.
 - [ ] (Stretch) Notify when another user owns a card you want — Supabase Edge Functions + Realtime *— deferred*.
 
-### 4.3 Import / Export
-- [ ] Export collection as CSV/JSON (server-side query → download)
-- [ ] Import cards from CSV (validation + bulk insert into `binder_cards`)
-- [ ] Export binder as printable PDF (`html2canvas` per page → `jsPDF`)
+### 4.3 Import / Export 🚧 In progress
+- [x] Export single binder as **CSV** or **JSON** — dropdown menu on the BinderView header (next to Edit Cover). Pure client-side via `src/lib/export.js` (Blob + temporary `<a download>`); skips empty slots; sanitises filenames; CSV is fully quoted so commas/quotes inside card names don't break parsing.
+- [x] Export the **whole collection** as CSV or JSON — buttons on Settings → Export collection. Single Supabase query with FK-embedded `binder_cards`, then formatted by the same `src/lib/export.js` helpers (CSV prefixes a `binder_name` column).
+- [ ] Import cards from CSV/JSON (validation + bulk insert into `binder_cards`) — *next*.
+- [ ] Export binder as printable PDF (`html2canvas` per page → `jsPDF`) — *deferred; needs library work*.
 
 **Milestone:** A social, shareable collection platform with public binders, wishlists, and bring-your-own data export.
 

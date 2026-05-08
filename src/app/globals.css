@@ -2191,3 +2191,70 @@ input[type="number"].input::-webkit-outer-spin-button {
   color: #ef4444;
   background: rgba(0, 0, 0, 0.7);
 }
+
+/* ── Owned badge on BinderView search results (Phase 4.2 polish) ─────────── */
+.search-card--owned {
+  outline: 2px solid rgba(16, 185, 129, 0.45);
+}
+.search-card__owned-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(16, 185, 129, 0.85);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ── Export dropdown menu (Phase 4.3) ────────────────────────────────────── */
+.export-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 240px;
+  background: rgba(20, 25, 40, 0.98);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.export-menu__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: white;
+  text-align: left;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.12s;
+}
+.export-menu__item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.export-menu__item > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.export-menu__hint {
+  font-size: 0.75rem;
+  opacity: 0.55;
+  font-weight: 400;
+}

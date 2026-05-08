@@ -25,6 +25,7 @@ import {
   useRemoveCard,
   useMoveCard,
   useSwapCards,
+  useOwnedApiIds,
   useWishlistedKeys,
   useAddToWishlist,
   useRemoveFromWishlist,
@@ -108,6 +109,10 @@ export default function DashboardShell() {
   // Wishlist (Phase 4.2): keys Set<"<api_id>::<game>"> drives the heart
   // badge in BinderView's search results. Toggle calls add/remove.
   const { data: wishlistedKeys = new Set() } = useWishlistedKeys(profile?.id);
+  // Owned-card cross-reference: a Set<card_api_id> across every binder this
+  // user owns. Used by BinderView to render the "Owned" badge alongside the
+  // wishlist heart on search results.
+  const { data: ownedApiIds = new Set() } = useOwnedApiIds(profile?.id);
   const addWishlistMut = useAddToWishlist();
   const removeWishlistMut = useRemoveFromWishlist();
 
@@ -514,6 +519,7 @@ export default function DashboardShell() {
             onGameChange={(game) => { setSearchGame(game); setSearchResults([]); setSearchQuery(''); }}
             currency={currency}
             wishlistedKeys={wishlistedKeys}
+            ownedApiIds={ownedApiIds}
             onToggleWishlist={handleToggleWishlist}
           />
         )}

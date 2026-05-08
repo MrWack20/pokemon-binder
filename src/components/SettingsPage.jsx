@@ -2,12 +2,14 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, User, Lock, Mail, Palette, ArrowLeft, LogOut, DollarSign } from 'lucide-react';
+import { Save, User, Lock, Mail, Palette, ArrowLeft, LogOut, DollarSign, Download, FileText, FileJson } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { BACKGROUND_THEMES } from '@/constants/themes';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUpdateProfile } from '@/hooks/queries';
 import { updateEmail, updatePassword } from '@/services/supabaseAuth';
+import { createClient } from '@/lib/supabase/client';
+import { exportCollectionCsv, exportCollectionJson } from '@/lib/export';
 
 const SETTINGS_KEY = 'pokemonBinderSettings';
 
@@ -34,7 +36,58 @@ export default function SettingsPage() {
 
   const [savingEmail, setSavingEmail] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const savingName = updateProfileMut.isPending;
+
+  /**
+   * Pull every binder + its cards for this profile in a single Supabase query
+   * (FK embedding), build a `cards`-array shape per binder, then hand off to
+   * the format-specific exporter. Skips the React Query layer because this is
+   * a one-shot click handler — no cache invalidation needed.
+   */
+  async function fetchCollectionForExport() {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('binders')
+      .select(`
+        id, name, rows, cols, pages, cover_color, cover_text, default_game,
+        binder_cards (
+          slot_index, card_api_id, card_name, card_image_url, card_set,
+          card_game, card_price, card_price_currency, added_at
+        )
+      `)
+      .eq('profile_id', profile.id)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return (data || []).map(b => ({
+      ...b,
+      // Match the shape exportBinderCsv / exportCollectionCsv expect:
+      // an array of card rows, not the FK-embedded `binder_cards`.
+      cards: b.binder_cards || [],
+    }));
+  }
+
+  async function handleExport(format) {
+    if (!profile?.id) return;
+    setExporting(true);
+    try {
+      const binders = await fetchCollectionForExport();
+      const totalCards = binders.reduce((s, b) => s + (b.cards?.length || 0), 0);
+      if (totalCards === 0) {
+        toast('Your collection is empty — nothing to export.', { icon: '📭' });
+        return;
+      }
+      if (format === 'csv') exportCollectionCsv(binders);
+      else exportCollectionJson(binders);
+      toast.success(`Exported ${totalCards} card${totalCards !== 1 ? 's' : ''} as ${format.toUpperCase()}.`);
+    } catch (err) {
+      console.error('export collection:', err);
+      toast.error('Failed to export collection.');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const isOAuth = user?.app_metadata?.provider !== 'email';
 
@@ -236,6 +289,35 @@ export default function SettingsPage() {
               <button onClick={handleSaveCurrency} className="btn btn-success">
                 <Save size={16} />Save Currency
               </button>
+            </section>
+
+            {/* ── Export collection ──────────────────────────────────── */}
+            <section className="settings-card">
+              <div className="settings-card__title">
+                <Download size={20} style={{ color: '#60a5fa' }} /><h3>Export collection</h3>
+              </div>
+              <p className="settings-card__desc">
+                Download every card across all your binders. CSV opens in any spreadsheet
+                tool. JSON preserves binder structure for re-import.
+              </p>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => handleExport('csv')}
+                  className="btn btn-secondary"
+                  disabled={exporting}
+                  style={{ flex: 1, minWidth: '160px', justifyContent: 'center' }}
+                >
+                  <FileText size={16} />{exporting ? 'Preparing…' : 'Download CSV'}
+                </button>
+                <button
+                  onClick={() => handleExport('json')}
+                  className="btn btn-secondary"
+                  disabled={exporting}
+                  style={{ flex: 1, minWidth: '160px', justifyContent: 'center' }}
+                >
+                  <FileJson size={16} />{exporting ? 'Preparing…' : 'Download JSON'}
+                </button>
+              </div>
             </section>
 
             {/* ── Sign Out ────────────────────────────────────────────── */}
