@@ -1709,6 +1709,10 @@ input[type="number"].input::-webkit-outer-spin-button {
   justify-content: center;
   width: 34px;
   height: 30px;
+  /* Reset the global <button> padding (0.6em 1.2em) — with box-sizing:
+     border-box and a 34px width, the default padding collapses the
+     content area to zero and the icon vanishes. */
+  padding: 0;
   border: none;
   border-radius: 7px;
   background: transparent;
