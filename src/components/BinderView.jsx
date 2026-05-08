@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Edit2, ChevronLeft, ChevronRight, Filter, X, Search,
-  Plus, GripVertical, SortAsc, Clock, LayoutGrid, Columns, Images, Maximize2,
+  Plus, GripVertical, SortAsc, Clock, LayoutGrid, Columns, Images, Maximize2, Heart,
 } from 'lucide-react';
 import { getRecentSearches } from '../services/searchService.js';
 import {
@@ -141,6 +141,9 @@ export default function BinderView({
   searchFilters, onFilterChange, sets, showFilters, onToggleFilters,
   searchPage, totalSearchPages, onSearchPageChange, onSwapCards,
   searchSort, onSortChange, currency, searchGame, onGameChange,
+  // Wishlist (Phase 4.2): a Set<"<api_id>::<game>"> + a single toggle
+  // callback. Both optional so the component still works on /share pages.
+  wishlistedKeys, onToggleWishlist,
 }) {
   const slotsPerPage  = binder.rows * binder.cols;
   const totalPages    = binder.pages;
@@ -587,8 +590,22 @@ export default function BinderView({
                   ?? card.tcgplayer?.prices?.['1stEditionHolofoil']?.market
                   ?? card.tcgplayer?.prices?.unlimited?.market
                   ?? null;
+                const cardGame = card._game ?? 'pokemon';
+                const wishlistKey = `${card.id}::${cardGame}`;
+                const isWishlisted = wishlistedKeys?.has(wishlistKey) ?? false;
                 return (
                   <div key={card.id} onClick={() => onAddCard(card)} className="search-card">
+                    {onToggleWishlist && (
+                      <button
+                        type="button"
+                        className={`search-card__wishlist-btn${isWishlisted ? ' is-active' : ''}`}
+                        title={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                        aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                        onClick={(e) => { e.stopPropagation(); onToggleWishlist(card, isWishlisted); }}
+                      >
+                        <Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />
+                      </button>
+                    )}
                     <img src={card.images.small} alt={card.name} loading="lazy" />
                     <p>{card.name}</p>
                     <p className="text-muted" style={{ fontSize: '0.7rem', marginBottom: '4px' }}>{card.set.name}</p>

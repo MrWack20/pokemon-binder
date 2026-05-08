@@ -207,12 +207,14 @@ The app is **live in production** at the project's Vercel domain. Anyone with th
 - [ ] (Stretch) Public gallery of featured/recent public binders
 - [ ] (Stretch) Embeddable iframe widget
 
-### 4.2 Wishlist & Trading
-- [ ] `wishlists` table (`user_id`, `card_api_id`, `card_name`, `card_game`, `priority`, `added_at`)
-- [ ] Wishlist UI — cards the user wants but doesn't have
-- [ ] "Have / Want" indicators on card search results (cross-ref `binder_cards` + `wishlists`)
-- [ ] `trade_list` table (cards willing to trade)
-- [ ] (Stretch) Notify when another user owns a card you want — Supabase Edge Functions + Realtime
+### 4.2 Wishlist & Trading 🚧 In progress
+- [x] `wishlists` table (migration `005`) — `profile_id`, `card_api_id`, `card_name`, `card_image_url`, `card_set`, `card_game`, `card_price`, `card_price_currency`, `priority`, `notes`, `added_at`. Full owner-only CRUD via RLS, indexes on the hot paths, `UNIQUE(profile_id, card_api_id, card_game)` so the same card can't be wishlisted twice.
+- [x] `/wishlist` page (`src/app/wishlist/page.jsx` + `components/WishlistPage.jsx`) — grouped by game, filters by name and game, priority star toggle, total-value summary, currency-aware. Empty/loading/error states all covered.
+- [x] Heart-toggle button on card search results in `BinderView` — instant optimistic update via React Query, single click adds, click again removes. Hooks: `useWishlist`, `useWishlistedKeys`, `useAddToWishlist`, `useRemoveFromWishlist`, `useUpdateWishlistItem`.
+- [x] Wishlist link added to header nav (alongside Browse Sets / Statistics).
+- [ ] "Have / Want" indicator on card search results — currently shows "wishlisted" only; need an "owned" badge cross-referencing `binder_cards` (already have `useOwnedApiIds` from SetsPage; just need to surface in BinderView's search panel).
+- [ ] `trade_list` table (cards willing to trade) — *deferred to 4.2 polish round*.
+- [ ] (Stretch) Notify when another user owns a card you want — Supabase Edge Functions + Realtime *— deferred*.
 
 ### 4.3 Import / Export
 - [ ] Export collection as CSV/JSON (server-side query → download)

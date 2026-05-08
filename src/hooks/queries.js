@@ -2,15 +2,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as binderSvc from '../services/binderService.js';
 import * as cardSvc from '../services/cardService.js';
 import * as profileSvc from '../services/profileService.js';
+import * as wishlistSvc from '../services/wishlistService.js';
 import { getCollectionStats } from '../services/statsService.js';
 
 // ─── Query keys ──────────────────────────────────────────────────────────────
 export const qk = {
-  profile:     (userId)    => ['profile', userId],
-  binders:     (profileId) => ['binders', profileId],
-  cards:       (binderId)  => ['cards', binderId],
-  ownedApiIds: (profileId) => ['owned-api-ids', profileId],
-  stats:       (profileId) => ['stats', profileId],
+  profile:        (userId)    => ['profile', userId],
+  binders:        (profileId) => ['binders', profileId],
+  cards:          (binderId)  => ['cards', binderId],
+  ownedApiIds:    (profileId) => ['owned-api-ids', profileId],
+  stats:          (profileId) => ['stats', profileId],
+  wishlist:       (profileId) => ['wishlist', profileId],
+  wishlistedKeys: (profileId) => ['wishlisted-keys', profileId],
 };
 
 // Service functions return { data, error } — throw on error so React Query
@@ -254,6 +257,100 @@ export function useUpdateProfile() {
     mutationFn: ({ profileId, updates }) => profileSvc.updateProfile(profileId, updates).then(unwrap),
     onSuccess: (data, { userId }) => {
       if (userId) qc.setQueryData(qk.profile(userId), data);
+    },
+  });
+}
+
+// ─── Wishlist (Phase 4.2) ───────────────────────────────────────────────────
+export function useWishlist(profileId) {
+  return useQuery({
+    queryKey: qk.wishlist(profileId),
+    queryFn: () => wishlistSvc.getWishlist(profileId).then(unwrap).then(d => d || []),
+    enabled: !!profileId,
+  });
+}
+
+/**
+ * Lightweight Set<"<card_api_id>::<game>"> used by search-result and set-page
+ * UIs to show a "wishlisted" badge without fetching every full row. Computed
+ * server-side; React Query keeps it in sync via the same cache invalidation
+ * the full wishlist gets.
+ */
+export function useWishlistedKeys(profileId) {
+  return useQuery({
+    queryKey: qk.wishlistedKeys(profileId),
+    queryFn: async () => {
+      const set = await wishlistSvc.getWishlistedKeys(profileId).then(unwrap);
+      return set || new Set();
+    },
+    enabled: !!profileId,
+  });
+}
+
+export function useAddToWishlist() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ profileId, cardData }) =>
+      wishlistSvc.addToWishlist(profileId, cardData).then(unwrap),
+    // Optimistic — flip the badge instantly even before the server confirms.
+    onMutate: async ({ profileId, cardData }) => {
+      await qc.cancelQueries({ queryKey: qk.wishlistedKeys(profileId) });
+      const previous = qc.getQueryData(qk.wishlistedKeys(profileId));
+      qc.setQueryData(qk.wishlistedKeys(profileId), (old = new Set()) => {
+        const next = new Set(old);
+        next.add(`${cardData.card_api_id}::${cardData.card_game ?? 'pokemon'}`);
+        return next;
+      });
+      return { previous };
+    },
+    onError: (_err, { profileId }, ctx) => {
+      if (ctx?.previous) qc.setQueryData(qk.wishlistedKeys(profileId), ctx.previous);
+    },
+    onSettled: (_data, _err, { profileId }) => {
+      qc.invalidateQueries({ queryKey: qk.wishlist(profileId) });
+      qc.invalidateQueries({ queryKey: qk.wishlistedKeys(profileId) });
+    },
+  });
+}
+
+export function useRemoveFromWishlist() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ wishlistId, profileId, cardApiId, cardGame }) => {
+      // Two call shapes: by id (from the wishlist page), or by card identity
+      // (from search-result heart toggle, which doesn't know the row id).
+      if (wishlistId) return wishlistSvc.removeFromWishlist(wishlistId).then(unwrap);
+      return wishlistSvc.removeFromWishlistByCard(profileId, cardApiId, cardGame).then(unwrap);
+    },
+    onMutate: async ({ profileId, cardApiId, cardGame }) => {
+      if (!profileId || !cardApiId) return;
+      await qc.cancelQueries({ queryKey: qk.wishlistedKeys(profileId) });
+      const previousKeys = qc.getQueryData(qk.wishlistedKeys(profileId));
+      qc.setQueryData(qk.wishlistedKeys(profileId), (old = new Set()) => {
+        const next = new Set(old);
+        next.delete(`${cardApiId}::${cardGame ?? 'pokemon'}`);
+        return next;
+      });
+      return { previousKeys };
+    },
+    onError: (_err, { profileId }, ctx) => {
+      if (ctx?.previousKeys) qc.setQueryData(qk.wishlistedKeys(profileId), ctx.previousKeys);
+    },
+    onSettled: (_data, _err, { profileId }) => {
+      if (!profileId) return;
+      qc.invalidateQueries({ queryKey: qk.wishlist(profileId) });
+      qc.invalidateQueries({ queryKey: qk.wishlistedKeys(profileId) });
+    },
+  });
+}
+
+export function useUpdateWishlistItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ wishlistId, updates }) =>
+      wishlistSvc.updateWishlistItem(wishlistId, updates).then(unwrap),
+    onSuccess: (_data, { profileId }) => {
+      if (profileId) qc.invalidateQueries({ queryKey: qk.wishlist(profileId) });
     },
   });
 }

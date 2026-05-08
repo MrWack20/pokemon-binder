@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams, usePathname, useSearchParams } from 'next/navigation';
 import { useIsMutating } from '@tanstack/react-query';
-import { Book, RefreshCw, Layers, BarChart2 } from 'lucide-react';
+import { Book, RefreshCw, Layers, BarChart2, Heart } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { createClient } from '@/lib/supabase/client';
 import { BACKGROUND_THEMES } from '@/constants/themes';
@@ -25,6 +25,9 @@ import {
   useRemoveCard,
   useMoveCard,
   useSwapCards,
+  useWishlistedKeys,
+  useAddToWishlist,
+  useRemoveFromWishlist,
 } from '@/hooks/queries';
 import { searchCards as searchCardsSvc, getSets, addRecentSearch } from '@/services/searchService';
 import { mtgCardToDbRow, searchMtgCards } from '@/services/mtgService';
@@ -101,6 +104,12 @@ export default function DashboardShell() {
   const removeCardMut = useRemoveCard();
   const moveCardMut = useMoveCard();
   const swapCardsMut = useSwapCards();
+
+  // Wishlist (Phase 4.2): keys Set<"<api_id>::<game>"> drives the heart
+  // badge in BinderView's search results. Toggle calls add/remove.
+  const { data: wishlistedKeys = new Set() } = useWishlistedKeys(profile?.id);
+  const addWishlistMut = useAddToWishlist();
+  const removeWishlistMut = useRemoveFromWishlist();
 
   const syncing = useIsMutating() > 0;
 
@@ -330,6 +339,61 @@ export default function DashboardShell() {
     }
   };
 
+  // Toggle a TCG-API card on/off the wishlist. Receives the same shape the
+  // search results render with — never a DB row — so we map to the
+  // wishlist column shape here, mirroring the addCard mappers.
+  const handleToggleWishlist = async (apiCard, isCurrentlyWishlisted) => {
+    if (!profile?.id) return;
+    const game = apiCard._game ?? 'pokemon';
+
+    if (isCurrentlyWishlisted) {
+      try {
+        await removeWishlistMut.mutateAsync({
+          profileId: profile.id,
+          cardApiId: apiCard.id,
+          cardGame: game,
+        });
+        toast.success(`Removed ${apiCard.name} from wishlist`);
+      } catch (err) {
+        console.error('removeWishlist:', err);
+        toast.error('Failed to update wishlist.');
+      }
+      return;
+    }
+
+    let cardData;
+    if (game === 'mtg') {
+      cardData = mtgCardToDbRow(apiCard);
+    } else if (game === 'yugioh') {
+      cardData = ygoCardToDbRow(apiCard);
+    } else if (game === 'onepiece') {
+      cardData = opCardToDbRow(apiCard);
+    } else {
+      cardData = {
+        card_api_id: apiCard.id,
+        card_name: apiCard.name,
+        card_image_url: apiCard.images?.small ?? apiCard.images?.large ?? '',
+        card_set: apiCard.set?.name ?? null,
+        card_game: 'pokemon',
+        card_price: apiCard._price
+          ?? apiCard.tcgplayer?.prices?.holofoil?.market
+          ?? apiCard.tcgplayer?.prices?.normal?.market
+          ?? apiCard.tcgplayer?.prices?.['1stEditionHolofoil']?.market
+          ?? apiCard.tcgplayer?.prices?.unlimited?.market
+          ?? null,
+        card_price_currency: 'USD',
+      };
+    }
+
+    try {
+      await addWishlistMut.mutateAsync({ profileId: profile.id, cardData });
+      toast.success(`Added ${apiCard.name} to wishlist`);
+    } catch (err) {
+      console.error('addWishlist:', err);
+      toast.error('Failed to add to wishlist.');
+    }
+  };
+
   const handleEditBinderSave = async (coverData, imageFile) => {
     try {
       let cover_image_url = coverData.cover_image_url;
@@ -385,6 +449,9 @@ export default function DashboardShell() {
               <div className="header-nav__links">
                 <button className="header-nav__btn" onClick={() => router.push('/sets')}>
                   <Layers size={16} />Browse Sets
+                </button>
+                <button className="header-nav__btn" onClick={() => router.push('/wishlist')}>
+                  <Heart size={16} />Wishlist
                 </button>
                 <button className="header-nav__btn" onClick={() => router.push('/stats')}>
                   <BarChart2 size={16} />Statistics
@@ -446,6 +513,8 @@ export default function DashboardShell() {
             searchGame={searchGame}
             onGameChange={(game) => { setSearchGame(game); setSearchResults([]); setSearchQuery(''); }}
             currency={currency}
+            wishlistedKeys={wishlistedKeys}
+            onToggleWishlist={handleToggleWishlist}
           />
         )}
 
