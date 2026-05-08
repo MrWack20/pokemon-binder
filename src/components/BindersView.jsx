@@ -1,12 +1,21 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Trash2, Eye, Copy, ArrowUpDown } from 'lucide-react';
+import { Plus, Trash2, Eye, Copy, ArrowUpDown, Share2, Globe } from 'lucide-react';
+import ShareBinderModal from './ShareBinderModal.jsx';
 import toast from 'react-hot-toast';
 
 export default function BindersView({ profile, binders, onCreateBinder, onSelectBinder, onDeleteBinder, onDuplicateBinder }) {
   const [showCreate, setShowCreate] = useState(false);
   const [sortOrder, setSortOrder] = useState('date_asc');
+  // Hold the *id* of the binder being shared (not the full object) so the
+  // modal stays in sync if the cache updates while it's open — toggling
+  // is_public via the modal itself triggers a re-render of BindersView,
+  // and we want the modal to reflect the new value immediately.
+  const [sharingBinderId, setSharingBinderId] = useState(null);
+  const sharingBinder = sharingBinderId
+    ? binders.find(b => b.id === sharingBinderId)
+    : null;
   const [binderForm, setBinderForm] = useState({
     name: '',
     rows: 3,
@@ -184,6 +193,15 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
                   backgroundPosition: 'center',
                 }}
               >
+                {binder.is_public && (
+                  <span
+                    className="binder-card__public-badge"
+                    title="This binder is public"
+                    aria-label="Public binder"
+                  >
+                    <Globe size={12} />Public
+                  </span>
+                )}
                 <h3 style={{
                   textShadow: binder.cover_image_url ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none',
                   color: binder.cover_image_url ? '#fff' : 'inherit',
@@ -200,6 +218,13 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
                 <div className="button-group">
                   <button onClick={() => onSelectBinder(binder)} className="btn btn-info">
                     <Eye size={16} />View
+                  </button>
+                  <button
+                    onClick={() => setSharingBinderId(binder.id)}
+                    className={`btn ${binder.is_public ? 'btn-success' : 'btn-secondary'}`}
+                    title={binder.is_public ? 'Public — manage share link' : 'Share this binder'}
+                  >
+                    {binder.is_public ? <Globe size={16} /> : <Share2 size={16} />}
                   </button>
                   <button
                     onClick={() => onDuplicateBinder?.(binder.id, binder.name)}
@@ -236,6 +261,13 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
           );
         })}
       </div>
+
+      {sharingBinder && (
+        <ShareBinderModal
+          binder={sharingBinder}
+          onClose={() => setSharingBinderId(null)}
+        />
+      )}
     </div>
   );
 }

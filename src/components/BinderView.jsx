@@ -4,9 +4,10 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Edit2, ChevronLeft, ChevronRight, Filter, X, Search,
   Plus, GripVertical, SortAsc, Clock, LayoutGrid, Columns, Images, Maximize2, Heart, CheckCircle2,
-  Download, FileText, FileJson,
+  Download, FileText, FileJson, Share2, Globe,
 } from 'lucide-react';
 import { exportBinderCsv, exportBinderJson } from '../lib/export.js';
+import ShareBinderModal from './ShareBinderModal.jsx';
 import { getRecentSearches } from '../services/searchService.js';
 import {
   DndContext, DragOverlay, closestCenter,
@@ -229,6 +230,7 @@ export default function BinderView({
   const [jumpInput, setJumpInput]     = useState('');
   const [activeDragId, setActiveDragId] = useState(null);
   const [viewMode, setViewMode]       = useState('page'); // 'page' | 'spread' | 'gallery'
+  const [shareOpen, setShareOpen]     = useState(false);
 
   const currencySymbol = { USD: '$', EUR: '€', GBP: '£' }[currency] || '$';
   const recentSearches = getRecentSearches();
@@ -339,6 +341,14 @@ export default function BinderView({
           >
             {searchIsOpen ? <X size={18} /> : <Search size={18} />}
             {searchIsOpen ? 'Close' : 'Add Card'}
+          </button>
+          <button
+            className={`btn ${binder.is_public ? 'btn-success' : 'btn-secondary'}`}
+            onClick={() => setShareOpen(true)}
+            title={binder.is_public ? 'Public — manage share link' : 'Share this binder'}
+          >
+            {binder.is_public ? <Globe size={18} /> : <Share2 size={18} />}
+            {binder.is_public ? 'Public' : 'Share'}
           </button>
           <ExportMenu binder={binder} />
           <button className="btn btn-primary" onClick={onEditCover}>
@@ -713,6 +723,10 @@ export default function BinderView({
           </aside>
         )}
       </div>
+
+      {shareOpen && (
+        <ShareBinderModal binder={binder} onClose={() => setShareOpen(false)} />
+      )}
     </div>
   );
 }

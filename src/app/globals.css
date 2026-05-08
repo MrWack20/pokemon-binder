@@ -2258,3 +2258,110 @@ input[type="number"].input::-webkit-outer-spin-button {
   opacity: 0.55;
   font-weight: 400;
 }
+
+/* ── Share modal (Phase 4.1 polish) ──────────────────────────────────────── */
+.share-modal {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  background: rgba(20, 25, 40, 0.98);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  padding: 32px 28px 24px;
+  color: white;
+}
+.share-modal__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.7);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.share-modal__close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+}
+.share-modal__header {
+  text-align: center;
+  margin-bottom: 18px;
+}
+.share-modal__icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  margin: 0 auto 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.share-modal__title {
+  font-size: 1.25rem;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+.share-modal__subtitle {
+  font-size: 0.85rem;
+  opacity: 0.6;
+  margin: 0;
+}
+.share-modal__desc {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  opacity: 0.78;
+  margin: 0 0 20px;
+}
+.share-modal__link-row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+.share-modal__link-input {
+  flex: 1;
+  font-size: 0.82rem;
+  margin-bottom: 0;
+}
+.share-modal__link-btn {
+  padding: 10px 12px;
+  flex-shrink: 0;
+  text-decoration: none;
+}
+.share-modal__primary-action {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Public badge in the upper-right of each BinderCard cover */
+.binder-card__public-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: rgba(16, 185, 129, 0.92);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 6px;
+  pointer-events: none;
+  text-shadow: none;
+}
+/* the binder-cover already isolates positioning; ensure it's relative so
+   the badge anchors correctly. */
+.binder-cover { position: relative; }
