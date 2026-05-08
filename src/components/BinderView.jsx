@@ -4,9 +4,11 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Edit2, ChevronLeft, ChevronRight, Filter, X, Search,
   Plus, GripVertical, SortAsc, Clock, LayoutGrid, Columns, Images, Maximize2, Heart, CheckCircle2,
-  Download, FileText, FileJson, Share2, Globe,
+  Download, FileText, FileJson, FileImage, Share2, Globe,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { exportBinderCsv, exportBinderJson } from '../lib/export.js';
+import { exportBinderPdf } from '../lib/exportPdf.js';
 import ShareBinderModal from './ShareBinderModal.jsx';
 import { getRecentSearches } from '../services/searchService.js';
 import {
@@ -24,6 +26,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 
 function ExportMenu({ binder }) {
   const [open, setOpen] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const ref = useRef(null);
 
   // Close on outside click / Escape.
@@ -43,6 +46,31 @@ function ExportMenu({ binder }) {
 
   const filledCount = (binder.cards || []).filter(c => c && c.id).length;
 
+  async function handlePdfExport() {
+    setOpen(false);
+    if (pdfBusy) return;
+    if (filledCount === 0) {
+      toast('This binder is empty — nothing to PDF.', { icon: '📭' });
+      return;
+    }
+    setPdfBusy(true);
+    const toastId = toast.loading(`Generating PDF (0/${filledCount})…`);
+    try {
+      const result = await exportBinderPdf(binder, (done, total) => {
+        toast.loading(`Generating PDF (${done}/${total})…`, { id: toastId });
+      });
+      const skipNote = result.skippedCards > 0
+        ? ` (${result.skippedCards} image${result.skippedCards !== 1 ? 's' : ''} couldn't load — placeholders used)`
+        : '';
+      toast.success(`PDF ready — ${result.totalCards} card${result.totalCards !== 1 ? 's' : ''}${skipNote}`, { id: toastId });
+    } catch (err) {
+      console.error('exportBinderPdf:', err);
+      toast.error('PDF export failed. Try again, or use CSV/JSON for now.', { id: toastId });
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button
@@ -52,8 +80,9 @@ function ExportMenu({ binder }) {
         title="Export this binder"
         aria-haspopup="menu"
         aria-expanded={open}
+        disabled={pdfBusy}
       >
-        <Download size={18} />Export
+        <Download size={18} />{pdfBusy ? 'Exporting…' : 'Export'}
       </button>
       {open && (
         <div className="export-menu" role="menu">
@@ -77,6 +106,18 @@ function ExportMenu({ binder }) {
             <span>
               Export as JSON
               <span className="export-menu__hint">includes binder layout for re-import</span>
+            </span>
+          </button>
+          <button
+            role="menuitem"
+            className="export-menu__item"
+            onClick={handlePdfExport}
+            disabled={pdfBusy}
+          >
+            <FileImage size={16} />
+            <span>
+              Export as PDF
+              <span className="export-menu__hint">printable A4, one page per binder page</span>
             </span>
           </button>
         </div>

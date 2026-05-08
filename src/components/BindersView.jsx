@@ -215,46 +215,58 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
                   {binder.rows}×{binder.cols} grid · {binder.pages} pages
                 </p>
                 <p className="text-muted">{cardCount}/{totalSlots} cards</p>
-                <div className="button-group">
-                  <button onClick={() => onSelectBinder(binder)} className="btn btn-info">
-                    <Eye size={16} />View
-                  </button>
+                <div className="binder-card__actions">
+                  {/* Primary action — full width, the obvious one to click */}
                   <button
-                    onClick={() => setSharingBinderId(binder.id)}
-                    className={`btn ${binder.is_public ? 'btn-success' : 'btn-secondary'}`}
-                    title={binder.is_public ? 'Public — manage share link' : 'Share this binder'}
+                    onClick={() => onSelectBinder(binder)}
+                    className="btn btn-info binder-card__primary"
                   >
-                    {binder.is_public ? <Globe size={16} /> : <Share2 size={16} />}
+                    <Eye size={16} />View binder
                   </button>
-                  <button
-                    onClick={() => onDuplicateBinder?.(binder.id, binder.name)}
-                    className="btn btn-secondary"
-                    title="Duplicate binder"
-                  >
-                    <Copy size={16} />
-                  </button>
-                  <button
-                    onClick={() => {
-                      toast((t) => (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <span>Delete <strong>{binder.name}</strong>? This cannot be undone.</span>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button
-                              onClick={() => { toast.dismiss(t.id); onDeleteBinder(binder.id); }}
-                              style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontWeight: 600 }}
-                            >Delete</button>
-                            <button
-                              onClick={() => toast.dismiss(t.id)}
-                              style={{ background: '#6b7280', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontWeight: 600 }}
-                            >Cancel</button>
+
+                  {/* Secondary row — equal-width icon buttons, breathing room */}
+                  <div className="binder-card__secondary">
+                    <button
+                      onClick={() => setSharingBinderId(binder.id)}
+                      className={`binder-card__icon-btn${binder.is_public ? ' binder-card__icon-btn--public' : ''}`}
+                      title={binder.is_public ? 'Public — manage share link' : 'Share this binder'}
+                      aria-label={binder.is_public ? 'Public, manage share link' : 'Share this binder'}
+                    >
+                      {binder.is_public ? <Globe size={16} /> : <Share2 size={16} />}
+                    </button>
+                    <button
+                      onClick={() => onDuplicateBinder?.(binder.id, binder.name)}
+                      className="binder-card__icon-btn"
+                      title="Duplicate binder"
+                      aria-label="Duplicate binder"
+                    >
+                      <Copy size={16} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        toast((t) => (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <span>Delete <strong>{binder.name}</strong>? This cannot be undone.</span>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                onClick={() => { toast.dismiss(t.id); onDeleteBinder(binder.id); }}
+                                style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontWeight: 600 }}
+                              >Delete</button>
+                              <button
+                                onClick={() => toast.dismiss(t.id)}
+                                style={{ background: '#6b7280', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontWeight: 600 }}
+                              >Cancel</button>
+                            </div>
                           </div>
-                        </div>
-                      ), { duration: Infinity });
-                    }}
-                    className="btn btn-danger"
-                  >
-                    <Trash2 size={20} />
-                  </button>
+                        ), { duration: Infinity });
+                      }}
+                      className="binder-card__icon-btn binder-card__icon-btn--danger"
+                      title="Delete binder"
+                      aria-label="Delete binder"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

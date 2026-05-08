@@ -2365,3 +2365,55 @@ input[type="number"].input::-webkit-outer-spin-button {
 /* the binder-cover already isolates positioning; ensure it's relative so
    the badge anchors correctly. */
 .binder-cover { position: relative; }
+
+/* ── Binder card actions (Phase 4.1 polish) ──────────────────────────────── */
+/* Two-row layout: primary "View" full-width, secondary icon row below.
+   Replaces the previous cramped 4-button single-row layout that got tight
+   when the Share button was added. */
+.binder-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+.binder-card__primary {
+  width: 100%;
+  justify-content: center;
+}
+.binder-card__secondary {
+  display: flex;
+  gap: 6px;
+}
+.binder-card__icon-btn {
+  flex: 1;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+.binder-card__icon-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: white;
+  transform: translateY(-1px);
+}
+.binder-card__icon-btn--public {
+  background: rgba(16, 185, 129, 0.85);
+  color: #fff;
+}
+.binder-card__icon-btn--public:hover {
+  background: rgba(16, 185, 129, 1);
+}
+.binder-card__icon-btn--danger {
+  color: #f87171;
+}
+.binder-card__icon-btn--danger:hover {
+  background: rgba(239, 68, 68, 0.85);
+  color: white;
+}

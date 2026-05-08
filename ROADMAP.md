@@ -207,21 +207,21 @@ The app is **live in production** at the project's Vercel domain. Anyone with th
 - [ ] (Stretch) Public gallery of featured/recent public binders
 - [ ] (Stretch) Embeddable iframe widget
 
-### 4.2 Wishlist & Trading 🚧 In progress
+### 4.2 Wishlist ✅ Complete
 - [x] `wishlists` table (migration `005`) — `profile_id`, `card_api_id`, `card_name`, `card_image_url`, `card_set`, `card_game`, `card_price`, `card_price_currency`, `priority`, `notes`, `added_at`. Full owner-only CRUD via RLS, indexes on the hot paths, `UNIQUE(profile_id, card_api_id, card_game)` so the same card can't be wishlisted twice.
 - [x] `/wishlist` page (`src/app/wishlist/page.jsx` + `components/WishlistPage.jsx`) — grouped by game, filters by name and game, priority star toggle, total-value summary, currency-aware. Empty/loading/error states all covered.
 - [x] Heart-toggle button on card search results in `BinderView` — instant optimistic update via React Query, single click adds, click again removes. Hooks: `useWishlist`, `useWishlistedKeys`, `useAddToWishlist`, `useRemoveFromWishlist`, `useUpdateWishlistItem`.
 - [x] Wishlist link added to header nav (alongside Browse Sets / Statistics).
 - [x] Heart-toggle button extended to **all three card grids in `SetsPage`** (Pokemon set view, MTG/YGO search results, One Piece set view) — same optimistic React Query flow, one shared handler.
 - [x] **Have/Want indicator** on BinderView search results — owned-badge (top-left, green) sits alongside the wishlist heart (top-right, red), driven by `useOwnedApiIds` cross-reference with `binder_cards`.
-- [ ] `trade_list` table (cards willing to trade) — *deferred to 4.2 polish round*.
-- [ ] (Stretch) Notify when another user owns a card you want — Supabase Edge Functions + Realtime *— deferred*.
+
+**Trading feature dropped (2026-05-08):** the original 4.2 scope included a `trade_list` table, "have/want" matching with other users, and Realtime notifications. The product direction shifted toward "personal collection tracker, optionally shared," not a trading marketplace — so the trading half is out of scope. Wishlist alone covers what users actually wanted (a private list of cards they're hunting).
 
 ### 4.3 Import / Export 🚧 In progress
 - [x] Export single binder as **CSV** or **JSON** — dropdown menu on the BinderView header (next to Edit Cover). Pure client-side via `src/lib/export.js` (Blob + temporary `<a download>`); skips empty slots; sanitises filenames; CSV is fully quoted so commas/quotes inside card names don't break parsing.
 - [x] Export the **whole collection** as CSV or JSON — buttons on Settings → Export collection. Single Supabase query with FK-embedded `binder_cards`, then formatted by the same `src/lib/export.js` helpers (CSV prefixes a `binder_name` column).
+- [x] **Export binder as PDF** (`src/lib/exportPdf.js`) — A4, cover page with summary, then one PDF page per binder page laid out in the binder's grid. Uses jsPDF directly (no html2canvas), images loaded via crossOrigin canvas → JPEG, dynamic import keeps jsPDF (~150KB) out of the initial bundle. Toast shows live `processed/total` progress; failed image loads draw a placeholder rectangle with the card name so the slot isn't empty.
 - [ ] Import cards from CSV/JSON (validation + bulk insert into `binder_cards`) — *next*.
-- [ ] Export binder as printable PDF (`html2canvas` per page → `jsPDF`) — *deferred; needs library work*.
 
 **Milestone:** A social, shareable collection platform with public binders, wishlists, and bring-your-own data export.
 
