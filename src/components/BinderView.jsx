@@ -282,6 +282,50 @@ export default function BinderView({
   const currentPageCards = binder.cards.slice(startIndex, startIndex + slotsPerPage);
   const pageValue        = currentPageCards.reduce((s, c) => s + (c?.card_price || 0), 0);
 
+  // ── Adjacent-page image preload ─────────────────────────────────────────
+  // Card images are loaded lazily, so flipping to a new page used to mean
+  // a network roundtrip per slot. We warm the browser's HTTP cache for
+  // pages currentPage ± 1 in the background — by the time the user clicks
+  // Next/Prev, those images are already decoded and ready to paint.
+  useEffect(() => {
+    const adjacentRanges = [];
+    if (currentPage + 1 < totalPages) {
+      const nextStart = (currentPage + 1) * slotsPerPage;
+      adjacentRanges.push([nextStart, nextStart + slotsPerPage]);
+    }
+    if (currentPage - 1 >= 0) {
+      const prevStart = (currentPage - 1) * slotsPerPage;
+      adjacentRanges.push([prevStart, prevStart + slotsPerPage]);
+    }
+
+    const urls = [];
+    for (const [s, e] of adjacentRanges) {
+      for (let i = s; i < e; i++) {
+        const c = binder.cards[i];
+        if (c?.card_image_url) urls.push(c.card_image_url);
+      }
+    }
+    if (!urls.length) return;
+
+    // `new Image()` with a src triggers the same fetch that <img> would,
+    // hitting the browser's HTTP cache. We don't append to DOM — the
+    // Image object is GC'd once it goes out of scope, after the browser
+    // has cached the response.
+    const cleanup = [];
+    for (const url of urls) {
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = url;
+      cleanup.push(img);
+    }
+    return () => {
+      // Best-effort: clear src to allow GC if the page changes again
+      // before all preloads finish.
+      cleanup.forEach(img => { img.src = ''; });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, slotsPerPage, totalPages, binder.id]);
+
   // ── Spread mode ──────────────────────────────────────────────────────────
   const spreadBase       = Math.floor(currentPage / 2) * 2;
   const leftStart        = spreadBase * slotsPerPage;

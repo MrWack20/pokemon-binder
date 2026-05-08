@@ -247,6 +247,8 @@ The app is **live in production** at the project's Vercel domain. Anyone with th
 - [x] **Image rendering polish** — every high-volume `<img>` gains `decoding="async"` so the browser decodes off the main thread; combined with existing `loading="lazy"` this cuts scroll jank on 250+ card pages
 - [x] **Bundle analyzer wired** (`@next/bundle-analyzer`) — run `ANALYZE=true npm run build` to inspect chunk graph at `.next/analyze/*.html`
 - [x] **Web Vitals reporting** (`web-vitals` package) — LCP / INP / CLS / FCP / TTFB logged to the browser console with rating, dynamically imported so it stays out of the initial bundle (~5KB)
+- [x] **Tab-navigation prefetch** — header nav buttons (Browse Sets / Wishlist / Statistics) and the BindersView "View binder" CTA are now `<Link>` instead of `router.push`. Next.js auto-prefetches each route's chunk + RSC payload while the link is in viewport, so by the time the user clicks the destination is already loaded. Single biggest perceived-speed win for cross-tab nav.
+- [x] **Adjacent-page image preload in BinderView** — when the user is on page N, an effect quietly fetches images for pages N-1 and N+1 via `new Image()` (browser HTTP cache). Clicking Next/Prev paints instantly instead of triggering 9-16 lazy-load fetches.
 - [ ] Image optimization (WebP via Supabase Storage transforms; would replace `unoptimized: true` in `next.config.js`)
 - [ ] Virtual scrolling for large search results (`react-window` / `react-virtuoso`)
 - [ ] Service worker / PWA for offline support

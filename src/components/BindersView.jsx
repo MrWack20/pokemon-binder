@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { Plus, Trash2, Eye, Copy, ArrowUpDown, Share2, Globe } from 'lucide-react';
 import ShareBinderModal from './ShareBinderModal.jsx';
 import toast from 'react-hot-toast';
@@ -216,13 +217,18 @@ export default function BindersView({ profile, binders, onCreateBinder, onSelect
                 </p>
                 <p className="text-muted">{cardCount}/{totalSlots} cards</p>
                 <div className="binder-card__actions">
-                  {/* Primary action — full width, the obvious one to click */}
-                  <button
-                    onClick={() => onSelectBinder(binder)}
+                  {/* Primary action — <Link> instead of <button> so Next
+                      prefetches the binder route's chunk + RSC payload
+                      while the card is in the viewport. By the time the
+                      user clicks, the binder view is ready to render.
+                      `onSelectBinder` (kept for backwards compatibility)
+                      no longer triggers navigation — the Link handles it. */}
+                  <Link
+                    href={`/binder/${binder.id}`}
                     className="btn btn-info binder-card__primary"
                   >
                     <Eye size={16} />View binder
-                  </button>
+                  </Link>
 
                   {/* Secondary row — equal-width icon buttons, breathing room */}
                   <div className="binder-card__secondary">

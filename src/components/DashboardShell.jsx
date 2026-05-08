@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter, useParams, usePathname, useSearchParams } from 'next/navigation';
 import { useIsMutating } from '@tanstack/react-query';
 import { Book, RefreshCw, Layers, BarChart2, Heart } from 'lucide-react';
@@ -260,7 +261,11 @@ export default function DashboardShell() {
     }
   };
 
-  const handleSelectBinder = (binder) => router.push(`/binder/${binder.id}`);
+  // BindersView's primary "View binder" button is now a <Link>, which
+  // handles navigation directly with route prefetch. handleSelectBinder
+  // remains as a no-op hook for any future analytics or pre-nav side
+  // effects, but the actual nav is owned by the link.
+  const handleSelectBinder = () => {};
 
   // ── Card CRUD ─────────────────────────────────────────────────────────────
   const handleAddCard = async (apiCard) => {
@@ -450,15 +455,20 @@ export default function DashboardShell() {
                 Organize and showcase your TCG collection digitally.
               </p>
               <div className="header-nav__links">
-                <button className="header-nav__btn" onClick={() => router.push('/sets')}>
+                {/* <Link> auto-prefetches each route's chunk + RSC payload
+                    when the link enters the viewport, so by the time the
+                    user clicks, the page is already loaded. Switching from
+                    router.push() to <Link> is the single biggest perceived-
+                    speed win for tab navigation. */}
+                <Link href="/sets" className="header-nav__btn">
                   <Layers size={16} />Browse Sets
-                </button>
-                <button className="header-nav__btn" onClick={() => router.push('/wishlist')}>
+                </Link>
+                <Link href="/wishlist" className="header-nav__btn">
                   <Heart size={16} />Wishlist
-                </button>
-                <button className="header-nav__btn" onClick={() => router.push('/stats')}>
+                </Link>
+                <Link href="/stats" className="header-nav__btn">
                   <BarChart2 size={16} />Statistics
-                </button>
+                </Link>
               </div>
             </div>
           )}
