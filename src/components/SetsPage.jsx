@@ -387,6 +387,11 @@ export default function SetsPage() {
                         </div>
                         <div className="set-card__info">
                           <p className="set-card__name">{set.name}</p>
+                          {set.englishName && (
+                            <p className="set-card__english-name" title="English name">
+                              {set.englishName}
+                            </p>
+                          )}
                           <p className="set-card__series">{set.series}</p>
                           <div className="set-card__meta">
                             <span>{set.printedTotal ?? set.total} cards</span>
@@ -409,6 +414,11 @@ export default function SetsPage() {
                   <img src={selectedSet.images.logo} alt={selectedSet.name} className="set-detail-logo" />
                 )}
                 <div className="set-detail-info">
+                  {selectedSet.englishName && (
+                    <p className="set-detail-english-name" title="English name">
+                      {selectedSet.englishName}
+                    </p>
+                  )}
                   <p className="set-detail-series">{selectedSet.series}</p>
                   <p className="set-detail-meta">
                     {selectedSet.printedTotal ?? selectedSet.total} cards &middot; Released {selectedSet.releaseDate}

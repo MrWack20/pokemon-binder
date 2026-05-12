@@ -226,6 +226,10 @@ The app is **live in production** at the project's Vercel domain. Anyone with th
 - [x] Language picker added to **SetsPage Pokémon tab**. Switching language reloads the set list from the appropriate API and clears any selected set so stale IDs can't be re-entered.
 - [x] **DashboardShell dispatches both `handleSearch` and `handleAddCard`** to the right service based on `apiCard._lang`. Wishlist toggle in SetsPage does the same. Mixed-language binders are first-class: a user can add an English Pikachu and a Japanese Pikachu to the same binder and the data layer doesn't care.
 - [x] Pricing intentionally omitted for non-English cards — TCGdex prices are Cardmarket EUR, our pipeline is TCGPlayer USD, and unifying them is a follow-up.
+- [x] **Cross-language search via PokéAPI translation** — type "blastoise" with Japanese selected and we find カメックス cards. Translation hits the PokéAPI species endpoint, mapped via `POKEAPI_LANG_MAP` (ja, ko, zh-Hant, fr, de, es, it). Original + translated queries fan out in parallel, results merged + deduped by id. In-memory cache per session. Non-Pokémon cards (Trainer / Item / Energy) aren't in PokéAPI's species index → fall back gracefully to raw query.
+- [x] **English set name alongside localized name** — `getTcgdexPokemonSets(lang)` fetches the English sets map in parallel and attaches `englishName` to each non-English set. Shows under the localized name on each set card and on the set-detail header. Japan-only sets simply have no englishName.
+- [x] **Hardened image URL extraction** — separate builders for cards (`<base>/<quality>.<ext>` pattern) and set logos (`<base>.<ext>` pattern), with extension-already-present detection so future API changes can't double-suffix.
+- [x] **"Type in English" hint** appears below the language picker once a non-English language is selected, so users discover the cross-language search affordance.
 
 ### 4.5 Global collection search ✅ Complete
 *"Where did I put that card?" — find any card across every binder.*

@@ -686,6 +686,11 @@ export default function BinderView({
                   <option value="id">Bahasa Indonesia</option>
                   <option value="th">ไทย · Thai</option>
                 </select>
+                {searchLang && searchLang !== 'en' && (
+                  <span className="lang-selector__hint" title="Cross-language search">
+                    💡 Type in English — we&apos;ll translate
+                  </span>
+                )}
               </div>
             )}
 
