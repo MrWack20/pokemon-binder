@@ -255,6 +255,10 @@ export default function BinderView({
   searchFilters, onFilterChange, sets, showFilters, onToggleFilters,
   searchPage, totalSearchPages, onSearchPageChange, onSwapCards,
   searchSort, onSortChange, currency, searchGame, onGameChange,
+  // Multi-language Pokémon (Phase 4.6): when searchGame === 'pokemon',
+  // the user picks a language (en/ja/ko/etc.) that the parent dispatches
+  // to the right backend (pokemontcg.io for English, TCGdex otherwise).
+  searchLang, onLangChange,
   // Wishlist (Phase 4.2): a Set<"<api_id>::<game>"> + a single toggle
   // callback. Both optional so the component still works on /share pages.
   wishlistedKeys, onToggleWishlist,
@@ -654,6 +658,36 @@ export default function BinderView({
                 </button>
               ))}
             </div>
+
+            {/* Language selector — only meaningful for Pokémon. Drives
+                whether the parent dispatches to pokemontcg.io (English)
+                or TCGdex (everything else). Hidden for other games
+                since they're already English-only via their own APIs. */}
+            {searchGame === 'pokemon' && onLangChange && (
+              <div className="lang-selector">
+                <label htmlFor="search-lang" className="lang-selector__label">
+                  Language
+                </label>
+                <select
+                  id="search-lang"
+                  className="input lang-selector__select"
+                  value={searchLang || 'en'}
+                  onChange={(e) => onLangChange(e.target.value)}
+                >
+                  <option value="en">English</option>
+                  <option value="ja">日本語 · Japanese</option>
+                  <option value="ko">한국어 · Korean</option>
+                  <option value="zh-tw">繁體中文 · Chinese (Traditional)</option>
+                  <option value="fr">Français · French</option>
+                  <option value="de">Deutsch · German</option>
+                  <option value="es">Español · Spanish</option>
+                  <option value="it">Italiano · Italian</option>
+                  <option value="pt-br">Português · Portuguese</option>
+                  <option value="id">Bahasa Indonesia</option>
+                  <option value="th">ไทย · Thai</option>
+                </select>
+              </div>
+            )}
 
             {recentSearches.length > 0 && !searchQuery && (
               <div className="recent-searches">

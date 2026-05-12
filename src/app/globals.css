@@ -2803,3 +2803,28 @@ input[type="number"].input::-webkit-outer-spin-button {
   color: #93c5fd;
   margin-bottom: 4px;
 }
+
+/* ── Language selector in BinderView search drawer (Phase 4.6) ───────────── */
+.lang-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+.lang-selector__label {
+  font-size: 0.78rem;
+  opacity: 0.65;
+  font-weight: 600;
+  white-space: nowrap;
+  margin-bottom: 0;
+}
+.lang-selector__select {
+  flex: 1;
+  margin-bottom: 0;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}

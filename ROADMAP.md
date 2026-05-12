@@ -217,6 +217,16 @@ The app is **live in production** at the project's Vercel domain. Anyone with th
 
 **Trading feature dropped (2026-05-08):** the original 4.2 scope included a `trade_list` table, "have/want" matching with other users, and Realtime notifications. The product direction shifted toward "personal collection tracker, optionally shared," not a trading marketplace — so the trading half is out of scope. Wishlist alone covers what users actually wanted (a private list of cards they're hunting).
 
+### 4.6 Multi-language Pokémon (TCGdex) ✅ Complete
+*Adds Japanese, Korean, Chinese Traditional, and 8 other languages to Pokémon search + sets browser — including Japan-only sets that never released in English.*
+
+- [x] New service `src/services/pokemonTcgdexService.js` wrapping the TCGdex v2 API (`api.tcgdex.net`). Provides `searchTcgdexPokemon`, `getTcgdexPokemonSets`, `getTcgdexPokemonSetCards`, and `tcgdexPokemonCardToDbRow`. Normalises every card to the shared display shape (`{ id, name, images: {small, large}, set, _game, _lang, _raw }`) so the existing BinderView / SetsPage / wishlist UIs render TCGdex cards without changes.
+- [x] **11 languages supported**: English (still routes to pokemontcg.io for TCGPlayer prices), Japanese, Korean, Chinese Traditional, French, German, Spanish, Italian, Portuguese (BR), Indonesian, Thai. *Simplified Chinese is not currently in TCGdex's catalog — the only ask we couldn't deliver cleanly.*
+- [x] Language picker added to **BinderView's search drawer** (only shown when game = Pokémon). Switching language re-fires the in-flight query automatically. Other games hide the picker since they're single-language via their own APIs.
+- [x] Language picker added to **SetsPage Pokémon tab**. Switching language reloads the set list from the appropriate API and clears any selected set so stale IDs can't be re-entered.
+- [x] **DashboardShell dispatches both `handleSearch` and `handleAddCard`** to the right service based on `apiCard._lang`. Wishlist toggle in SetsPage does the same. Mixed-language binders are first-class: a user can add an English Pikachu and a Japanese Pikachu to the same binder and the data layer doesn't care.
+- [x] Pricing intentionally omitted for non-English cards — TCGdex prices are Cardmarket EUR, our pipeline is TCGPlayer USD, and unifying them is a follow-up.
+
 ### 4.5 Global collection search ✅ Complete
 *"Where did I put that card?" — find any card across every binder.*
 

@@ -8,6 +8,11 @@ import { getSets, getSetCards } from '@/services/searchService';
 import { searchMtgCards, mtgCardToDbRow } from '@/services/mtgService';
 import { searchYgoCards, ygoCardToDbRow } from '@/services/yugiohService';
 import { getOpSets, getOpSetCards, opCardToDbRow } from '@/services/onepieceService';
+import {
+  getTcgdexPokemonSets,
+  getTcgdexPokemonSetCards,
+  tcgdexPokemonCardToDbRow,
+} from '@/services/pokemonTcgdexService';
 import { useOwnedApiIds, useWishlistedKeys, useAddToWishlist, useRemoveFromWishlist } from '@/hooks/queries';
 import { useAuth } from '@/contexts/AuthContext';
 import CardDetailModal from './CardDetailModal.jsx';
@@ -53,6 +58,11 @@ export default function SetsPage() {
   const symbol = CURRENCY_SYMBOL[currency] || '$';
 
   const [activeGame, setActiveGame] = useState('pokemon');
+
+  // Pokémon language. 'en' → pokemontcg.io (TCGPlayer prices, full filters);
+  // anything else → TCGdex (Japan-only sets, Korean, Chinese Traditional,
+  // and other European translations). Reset when leaving the Pokémon tab.
+  const [pokemonLang, setPokemonLang] = useState('en');
 
   // Pokémon set state
   const [sets, setSets] = useState([]);
@@ -112,6 +122,9 @@ export default function SetsPage() {
     if (game === 'mtg') cardData = mtgCardToDbRow(apiCard);
     else if (game === 'yugioh') cardData = ygoCardToDbRow(apiCard);
     else if (game === 'onepiece') cardData = opCardToDbRow(apiCard);
+    else if (game === 'pokemon' && apiCard._lang && apiCard._lang !== 'en') {
+      cardData = tcgdexPokemonCardToDbRow(apiCard);
+    }
     else cardData = {
       card_api_id: apiCard.id,
       card_name: apiCard.name,
@@ -135,13 +148,27 @@ export default function SetsPage() {
     }
   }, [profile?.id, wishlistedKeys, addWishlistMut, removeWishlistMut]);
 
-  // ── Load Pokémon sets on mount ──────────────────────────────────────────
+  // ── Load Pokémon sets — re-runs when language changes ──────────────────
+  // English uses pokemontcg.io (better English data + TCGPlayer prices),
+  // every other language uses TCGdex (Japan-only sets, Korean, etc.).
   useEffect(() => {
-    getSets().then(({ data }) => {
+    let cancelled = false;
+    setLoadingSets(true);
+    setSelectedSet(null);
+    setCards([]);
+
+    const fetcher = pokemonLang === 'en'
+      ? getSets()
+      : getTcgdexPokemonSets(pokemonLang);
+
+    fetcher.then(({ data }) => {
+      if (cancelled) return;
       setSets(data || []);
       setLoadingSets(false);
     });
-  }, []);
+
+    return () => { cancelled = true; };
+  }, [pokemonLang]);
 
   // ── Load One Piece sets when tab is first opened ────────────────────────
   useEffect(() => {
@@ -182,7 +209,10 @@ export default function SetsPage() {
     setSelectedSet(set);
     setCards([]);
     setLoadingCards(true);
-    const { data } = await getSetCards(set.id, cardSort);
+    // Dispatch by language — pokemontcg.io for English, TCGdex otherwise.
+    const { data } = pokemonLang === 'en'
+      ? await getSetCards(set.id, cardSort)
+      : await getTcgdexPokemonSetCards(set.id, pokemonLang);
     setCards(data || []);
     setLoadingCards(false);
   }
@@ -191,7 +221,11 @@ export default function SetsPage() {
     setCardSort(sort);
     if (!selectedSet) return;
     setLoadingCards(true);
-    const { data } = await getSetCards(selectedSet.id, sort);
+    // TCGdex doesn't expose a sort param; we sort client-side instead.
+    // For English we still use the API's orderBy for set order accuracy.
+    const { data } = pokemonLang === 'en'
+      ? await getSetCards(selectedSet.id, sort)
+      : await getTcgdexPokemonSetCards(selectedSet.id, pokemonLang);
     setCards(data || []);
     setLoadingCards(false);
   }
@@ -310,6 +344,27 @@ export default function SetsPage() {
                 >
                   <option value="">All Series</option>
                   {seriesList.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                {/* Language switcher — English uses pokemontcg.io (default,
+                    best English data); every other code routes to TCGdex
+                    for Japan-only sets, Korean, Chinese Traditional, etc. */}
+                <select
+                  value={pokemonLang}
+                  onChange={e => setPokemonLang(e.target.value)}
+                  className="input sets-series-select"
+                  title="Set language / region"
+                >
+                  <option value="en">🇺🇸 English</option>
+                  <option value="ja">🇯🇵 Japanese</option>
+                  <option value="ko">🇰🇷 Korean</option>
+                  <option value="zh-tw">🇹🇼 Chinese (Trad.)</option>
+                  <option value="fr">🇫🇷 French</option>
+                  <option value="de">🇩🇪 German</option>
+                  <option value="es">🇪🇸 Spanish</option>
+                  <option value="it">🇮🇹 Italian</option>
+                  <option value="pt-br">🇧🇷 Portuguese</option>
+                  <option value="id">🇮🇩 Indonesian</option>
+                  <option value="th">🇹🇭 Thai</option>
                 </select>
               </div>
 

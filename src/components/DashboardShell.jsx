@@ -38,6 +38,11 @@ import { searchCards as searchCardsSvc, getSets, addRecentSearch } from '@/servi
 import { mtgCardToDbRow, searchMtgCards } from '@/services/mtgService';
 import { ygoCardToDbRow, searchYgoCards } from '@/services/yugiohService';
 import { opCardToDbRow, searchOpCards } from '@/services/onepieceService';
+import {
+  searchTcgdexPokemon,
+  tcgdexPokemonCardToDbRow,
+  isTcgdexLang,
+} from '@/services/pokemonTcgdexService';
 
 const supabase = createClient();
 
@@ -160,6 +165,11 @@ export default function DashboardShell() {
   const [totalSearchPages, setTotalSearchPages] = useState(0);
   const [searchSort, setSearchSort] = useState('');
   const [searchGame, setSearchGame] = useState('pokemon');
+  // Language for Pokémon search/sets. 'en' routes to pokemontcg.io;
+  // anything else routes to TCGdex (multi-language coverage including
+  // Japan-only sets, Korean, Chinese Traditional, etc.). Other games
+  // ignore this — they're single-language via their own APIs.
+  const [searchLang, setSearchLang] = useState('en');
   const [modalCard, setModalCard] = useState(null);
   const [inspectCard, setInspectCard] = useState(null);
 
@@ -194,7 +204,7 @@ export default function DashboardShell() {
   }, [appSettings.backgroundTheme]);
 
   // ── Search ────────────────────────────────────────────────────────────────
-  const handleSearch = async (query, filters = searchFilters, page = 1, sort = searchSort, game = searchGame) => {
+  const handleSearch = async (query, filters = searchFilters, page = 1, sort = searchSort, game = searchGame, lang = searchLang) => {
     setLoading(true);
     setSearchResults([]);
     if (query?.trim()) addRecentSearch(query);
@@ -203,6 +213,13 @@ export default function DashboardShell() {
     if (game === 'mtg') result = await searchMtgCards(query, page);
     else if (game === 'yugioh') result = await searchYgoCards(query, page);
     else if (game === 'onepiece') result = await searchOpCards(query, page);
+    else if (game === 'pokemon' && lang && lang !== 'en' && isTcgdexLang(lang)) {
+      // Non-English Pokémon → TCGdex multi-language API.
+      // Filters (set/type/rarity/etc.) don't apply here — TCGdex's
+      // search is name-only — but the game still benefits from coverage
+      // of Japan-only sets, Korean releases, etc.
+      result = await searchTcgdexPokemon(query, lang, page);
+    }
     else result = await searchCardsSvc(query, filters, page, sort);
 
     const { data, error } = result;
@@ -284,6 +301,11 @@ export default function DashboardShell() {
     if (game === 'mtg') dbRow = mtgCardToDbRow(apiCard);
     else if (game === 'yugioh') dbRow = ygoCardToDbRow(apiCard);
     else if (game === 'onepiece') dbRow = opCardToDbRow(apiCard);
+    else if (game === 'pokemon' && apiCard._lang && apiCard._lang !== 'en') {
+      // Non-English Pokémon came from TCGdex — its shape doesn't have
+      // tcgplayer.prices, so use the dedicated mapper.
+      dbRow = tcgdexPokemonCardToDbRow(apiCard);
+    }
     else {
       dbRow = {
         card_api_id: apiCard.id,
@@ -387,6 +409,8 @@ export default function DashboardShell() {
       cardData = ygoCardToDbRow(apiCard);
     } else if (game === 'onepiece') {
       cardData = opCardToDbRow(apiCard);
+    } else if (game === 'pokemon' && apiCard._lang && apiCard._lang !== 'en') {
+      cardData = tcgdexPokemonCardToDbRow(apiCard);
     } else {
       cardData = {
         card_api_id: apiCard.id,
@@ -543,7 +567,25 @@ export default function DashboardShell() {
             searchSort={searchSort}
             onSortChange={(sort) => { setSearchSort(sort); handleSearch(searchQuery, searchFilters, 1, sort, searchGame); }}
             searchGame={searchGame}
-            onGameChange={(game) => { setSearchGame(game); setSearchResults([]); setSearchQuery(''); }}
+            onGameChange={(game) => {
+              setSearchGame(game);
+              setSearchResults([]);
+              setSearchQuery('');
+              // Language only applies to Pokémon; reset to English when
+              // switching to another game so the next Pokémon switch is
+              // clean rather than starting with a stale non-en code.
+              if (game !== 'pokemon') setSearchLang('en');
+            }}
+            searchLang={searchLang}
+            onLangChange={(lang) => {
+              setSearchLang(lang);
+              setSearchResults([]);
+              // Auto-fire if there's already a query — switching language
+              // mid-typing should immediately show the new-language results.
+              if (searchQuery?.trim()?.length >= 3) {
+                handleSearch(searchQuery, searchFilters, 1, searchSort, searchGame, lang);
+              }
+            }}
             currency={currency}
             wishlistedKeys={wishlistedKeys}
             ownedApiIds={ownedApiIds}
