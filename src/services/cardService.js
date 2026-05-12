@@ -85,6 +85,49 @@ export async function getOwnedApiIds(profileId) {
 }
 
 /**
+ * Global "where is this card?" search across every binder the profile owns.
+ * Returns matching binder_cards with their parent binder's name + grid
+ * dimensions so the UI can compute which page each card lives on.
+ *
+ * `query` is matched case-insensitively against `card_name` (ILIKE). Empty
+ * query returns nothing — this view is search-only, not "show me everything"
+ * (that's what the binders list is for).
+ *
+ * `gameFilter` is optional — pass 'pokemon' / 'mtg' / 'yugioh' / 'onepiece'
+ * to restrict to one game. Pass null/undefined for all games.
+ *
+ * Results are server-side ordered by card_name so identical cards across
+ * binders cluster together, and capped at 200 so very generic queries
+ * (e.g. "the") don't blow up the UI.
+ */
+export async function findOwnedCards(profileId, query, gameFilter) {
+  if (!profileId || !query || !query.trim() || query.trim().length < 2) {
+    return { data: [], error: null };
+  }
+
+  // Embed the parent binder so we get its name + dimensions in one round
+  // trip. RLS only lets us see binders we own, and binder_cards inherits
+  // via the binder_id FK — so even though we don't filter by profile_id
+  // here, the join is implicitly scoped to this profile's binders.
+  let q = supabase
+    .from('binder_cards')
+    .select(`
+      id, slot_index, card_api_id, card_name, card_image_url, card_set,
+      card_game, card_price, card_price_currency, added_at,
+      binder:binders!inner ( id, name, rows, cols, pages, profile_id )
+    `)
+    .eq('binder.profile_id', profileId)
+    .ilike('card_name', `%${query.trim()}%`)
+    .order('card_name', { ascending: true })
+    .limit(200);
+
+  if (gameFilter) q = q.eq('card_game', gameFilter);
+
+  const { data, error } = await q;
+  return { data: data || [], error };
+}
+
+/**
  * Swap two cards between slots using sentinel slot -1 for the UNIQUE constraint.
  */
 export async function swapCards(cardId1, cardId2) {

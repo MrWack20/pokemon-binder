@@ -14,6 +14,9 @@ export const qk = {
   stats:          (profileId) => ['stats', profileId],
   wishlist:       (profileId) => ['wishlist', profileId],
   wishlistedKeys: (profileId) => ['wishlisted-keys', profileId],
+  // Per-profile collection search (Phase 4.5 — "Find a card I own"):
+  myCollection:   (profileId, query, gameFilter) =>
+                  ['my-collection', profileId, query, gameFilter ?? 'all'],
   // Public, no profile scope:
   publicBinders:  () => ['public-binders'],
   news:           () => ['news'],
@@ -355,6 +358,24 @@ export function useUpdateWishlistItem() {
     onSuccess: (_data, { profileId }) => {
       if (profileId) qc.invalidateQueries({ queryKey: qk.wishlist(profileId) });
     },
+  });
+}
+
+// ─── Find-a-card global collection search (Phase 4.5) ───────────────────────
+//
+// Cross-binder search keyed on the trimmed query + game filter. We disable
+// the query for sub-2-character queries to avoid hammering PostgREST while
+// the user is mid-keystroke. The 5-min stale time means repeated searches
+// (e.g. "charizard" → switch to MTG → back) hit cache instantly.
+export function useMyCollection(profileId, query, gameFilter) {
+  const trimmed = (query || '').trim();
+  return useQuery({
+    queryKey: qk.myCollection(profileId, trimmed, gameFilter),
+    queryFn: () =>
+      cardSvc.findOwnedCards(profileId, trimmed, gameFilter).then(unwrap),
+    enabled: !!profileId && trimmed.length >= 2,
+    staleTime: 5 * 60 * 1000,
+    placeholderData: (prev) => prev, // keep old results visible while a new search runs
   });
 }
 

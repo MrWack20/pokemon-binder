@@ -217,6 +217,14 @@ The app is **live in production** at the project's Vercel domain. Anyone with th
 
 **Trading feature dropped (2026-05-08):** the original 4.2 scope included a `trade_list` table, "have/want" matching with other users, and Realtime notifications. The product direction shifted toward "personal collection tracker, optionally shared," not a trading marketplace — so the trading half is out of scope. Wishlist alone covers what users actually wanted (a private list of cards they're hunting).
 
+### 4.5 Global collection search ✅ Complete
+*"Where did I put that card?" — find any card across every binder.*
+
+- [x] `findOwnedCards(profileId, query, gameFilter)` service — case-insensitive `ILIKE` on `card_name`, joined to the parent binder so each result carries the binder name + grid dimensions for slot-to-page math. Server-side scoped by `binder.profile_id` (defence in depth on top of RLS). Hard-capped at 200 results so generic queries can't blow up the UI.
+- [x] `useMyCollection(profileId, query, gameFilter)` hook — disabled for sub-2-character queries, 5-min stale time, `placeholderData` keeps results visible while a new query streams in (no flash of empty state).
+- [x] `/collection` page (`CollectionSearchPage.jsx`) — autoFocused search input with 250ms debounce, per-game tab filter, results grouped by binder. Each card links straight to `/binder/<id>?page=N` with the page computed from `slot_index` and the binder's grid. Summary line shows match count + total value.
+- [x] **"Find a card" nav link** added to the header. First in the row so it's the most-visible answer to "where is X?"
+
 ### 4.4 Community gallery + TCG news ✅ Complete
 *Two home-page surfaces that turn the dashboard into a discovery space.*
 

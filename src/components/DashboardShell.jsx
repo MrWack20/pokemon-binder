@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams, usePathname, useSearchParams } from 'next/navigation';
 import { useIsMutating } from '@tanstack/react-query';
-import { Book, RefreshCw, Layers, BarChart2, Heart } from 'lucide-react';
+import { Book, RefreshCw, Layers, BarChart2, Heart, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { createClient } from '@/lib/supabase/client';
 import { withViewTransition } from '@/lib/viewTransition';
@@ -469,6 +469,9 @@ export default function DashboardShell() {
                     user clicks, the page is already loaded. Switching from
                     router.push() to <Link> is the single biggest perceived-
                     speed win for tab navigation. */}
+                <Link href="/collection" className="header-nav__btn">
+                  <Search size={16} />Find a card
+                </Link>
                 <Link href="/sets" className="header-nav__btn">
                   <Layers size={16} />Browse Sets
                 </Link>
