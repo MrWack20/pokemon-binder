@@ -22,21 +22,17 @@
 const BASE_URL = 'https://api.tcgdex.net/v2';
 const POKEAPI_BASE = 'https://pokeapi.co/api/v2';
 
-// Language codes TCGdex supports (as of late 2025). zh-cn / Simplified
-// Chinese is NOT in their catalog — only zh-tw (Traditional). Keep this
-// list authoritative; the UI dropdown reads from it.
+// Language codes TCGdex supports. Trimmed to the four locales we care about:
+// English baseline, plus the three Asian releases users keep asking for
+// (Japan-only sets, Korean releases, zh-tw Traditional Chinese). Other
+// TCGdex languages (fr/de/es/it/pt-br/id/th) are intentionally hidden — they
+// inflate the dropdown and trigger extra translation API calls that nobody
+// uses in practice. Add them back here if user demand returns.
 export const TCGDEX_LANGS = [
   { code: 'en',    label: 'English' },
   { code: 'ja',    label: '日本語 · Japanese' },
   { code: 'ko',    label: '한국어 · Korean' },
   { code: 'zh-tw', label: '繁體中文 · Chinese (Traditional)' },
-  { code: 'fr',    label: 'Français · French' },
-  { code: 'de',    label: 'Deutsch · German' },
-  { code: 'es',    label: 'Español · Spanish' },
-  { code: 'it',    label: 'Italiano · Italian' },
-  { code: 'pt-br', label: 'Português · Portuguese (BR)' },
-  { code: 'id',    label: 'Bahasa Indonesia · Indonesian' },
-  { code: 'th',    label: 'ไทย · Thai' },
 ];
 
 // Map our TCGdex language codes → PokéAPI's language identifiers (used by
@@ -46,12 +42,6 @@ const POKEAPI_LANG_MAP = {
   ja:      'ja',
   ko:      'ko',
   'zh-tw': 'zh-Hant',
-  fr:      'fr',
-  de:      'de',
-  es:      'es',
-  it:      'it',
-  // No useful PokéAPI translations for id/th/pt-br for Pokémon species
-  // names — falls through to raw query.
 };
 
 // Whether the language has TCGdex coverage (i.e., we should route to

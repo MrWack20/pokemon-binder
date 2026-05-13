@@ -358,13 +358,6 @@ export default function SetsPage() {
                   <option value="ja">🇯🇵 Japanese</option>
                   <option value="ko">🇰🇷 Korean</option>
                   <option value="zh-tw">🇹🇼 Chinese (Trad.)</option>
-                  <option value="fr">🇫🇷 French</option>
-                  <option value="de">🇩🇪 German</option>
-                  <option value="es">🇪🇸 Spanish</option>
-                  <option value="it">🇮🇹 Italian</option>
-                  <option value="pt-br">🇧🇷 Portuguese</option>
-                  <option value="id">🇮🇩 Indonesian</option>
-                  <option value="th">🇹🇭 Thai</option>
                 </select>
               </div>
 
@@ -456,7 +449,7 @@ export default function SetsPage() {
                 <CardGridSkeleton count={Math.min(selectedSet.printedTotal ?? selectedSet.total ?? 12, 24)} />
               ) : (
                 <div className="sets-card-grid">
-                  {cards.map(card => {
+                  {cards.map((card, idx) => {
                     const price = card.tcgplayer?.prices?.holofoil?.market
                       ?? card.tcgplayer?.prices?.normal?.market
                       ?? card.tcgplayer?.prices?.['1stEditionHolofoil']?.market
@@ -464,6 +457,10 @@ export default function SetsPage() {
                     const owned = ownedIds.has(card.id);
                     const cardGame = card._game ?? 'pokemon';
                     const isWishlisted = wishlistedKeys.has(`${card.id}::${cardGame}`);
+                    // First 12 cards are above the fold on most viewports —
+                    // eager-load + high fetchpriority so they start downloading
+                    // with the HTML instead of waiting for IntersectionObserver.
+                    const isAboveFold = idx < 12;
                     return (
                       <div key={card.id} className={`sets-browse-card${owned ? ' sets-browse-card--owned' : ''}`} onClick={() => setModalCard(card)}>
                         {owned && <span className="sets-browse-card__owned-badge"><CheckCircle2 size={12} />Owned</span>}
@@ -476,7 +473,13 @@ export default function SetsPage() {
                         >
                           <Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />
                         </button>
-                        <img src={card.images.small} alt={card.name} loading="lazy" decoding="async" />
+                        <img
+                          src={card.images.small}
+                          alt={card.name}
+                          loading={isAboveFold ? 'eager' : 'lazy'}
+                          fetchpriority={isAboveFold ? 'high' : 'auto'}
+                          decoding="async"
+                        />
                         <p className="sets-browse-card__name">{card.name}</p>
                         <p className="sets-browse-card__number">#{card.number}</p>
                         {price != null
@@ -542,10 +545,11 @@ export default function SetsPage() {
                 <>
                   <p className="sets-count">{searchResults.length} result{searchResults.length !== 1 ? 's' : ''}</p>
                   <div className="sets-card-grid">
-                    {searchResults.map(card => {
+                    {searchResults.map((card, idx) => {
                       const owned = ownedIds.has(card.id);
                       const cardGame = card._game ?? activeGame ?? 'pokemon';
                       const isWishlisted = wishlistedKeys.has(`${card.id}::${cardGame}`);
+                      const isAboveFold = idx < 12;
                       return (
                         <div key={card.id} className={`sets-browse-card${owned ? ' sets-browse-card--owned' : ''}`} onClick={() => setModalCard(card)}>
                           {owned && <span className="sets-browse-card__owned-badge"><CheckCircle2 size={12} />Owned</span>}
@@ -558,7 +562,13 @@ export default function SetsPage() {
                           >
                             <Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />
                           </button>
-                          <img src={card.images?.small || card.images?.large} alt={card.name} loading="lazy" decoding="async" />
+                          <img
+                            src={card.images?.small || card.images?.large}
+                            alt={card.name}
+                            loading={isAboveFold ? 'eager' : 'lazy'}
+                            fetchpriority={isAboveFold ? 'high' : 'auto'}
+                            decoding="async"
+                          />
                           <p className="sets-browse-card__name">{card.name}</p>
                           {card.set?.name && <p className="sets-browse-card__number">{card.set.name}</p>}
                           {card._price != null
@@ -670,10 +680,11 @@ export default function SetsPage() {
                 <p style={{ textAlign: 'center', padding: '40px 0', opacity: 0.5 }}>No cards found in this set.</p>
               ) : (
                 <div className="sets-card-grid">
-                  {opCards.map(card => {
+                  {opCards.map((card, idx) => {
                     const owned = ownedIds.has(card.id);
                     const cardGame = card._game ?? 'onepiece';
                     const isWishlisted = wishlistedKeys.has(`${card.id}::${cardGame}`);
+                    const isAboveFold = idx < 12;
                     return (
                       <div key={card.id} className={`sets-browse-card${owned ? ' sets-browse-card--owned' : ''}`} onClick={() => setModalCard(card)}>
                         {owned && <span className="sets-browse-card__owned-badge"><CheckCircle2 size={12} />Owned</span>}
@@ -687,7 +698,13 @@ export default function SetsPage() {
                           <Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />
                         </button>
                         {card.images?.small
-                          ? <img src={card.images.small} alt={card.name} loading="lazy" decoding="async" />
+                          ? <img
+                              src={card.images.small}
+                              alt={card.name}
+                              loading={isAboveFold ? 'eager' : 'lazy'}
+                              fetchpriority={isAboveFold ? 'high' : 'auto'}
+                              decoding="async"
+                            />
                           : <div style={{ width: '100%', aspectRatio: '2.5/3.5', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Layers size={24} style={{ opacity: 0.3 }} /></div>
                         }
                         <p className="sets-browse-card__name">{card.name}</p>

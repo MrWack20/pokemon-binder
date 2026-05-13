@@ -678,13 +678,6 @@ export default function BinderView({
                   <option value="ja">日本語 · Japanese</option>
                   <option value="ko">한국어 · Korean</option>
                   <option value="zh-tw">繁體中文 · Chinese (Traditional)</option>
-                  <option value="fr">Français · French</option>
-                  <option value="de">Deutsch · German</option>
-                  <option value="es">Español · Spanish</option>
-                  <option value="it">Italiano · Italian</option>
-                  <option value="pt-br">Português · Portuguese</option>
-                  <option value="id">Bahasa Indonesia</option>
-                  <option value="th">ไทย · Thai</option>
                 </select>
                 {searchLang && searchLang !== 'en' && (
                   <span className="lang-selector__hint" title="Cross-language search">
@@ -798,7 +791,7 @@ export default function BinderView({
             )}
 
             <div className="card-results drawer-results">
-              {searchResults.map(card => {
+              {searchResults.map((card, idx) => {
                 const p = card._price
                   ?? card.tcgplayer?.prices?.holofoil?.market
                   ?? card.tcgplayer?.prices?.normal?.market
@@ -809,6 +802,7 @@ export default function BinderView({
                 const wishlistKey = `${card.id}::${cardGame}`;
                 const isWishlisted = wishlistedKeys?.has(wishlistKey) ?? false;
                 const isOwned = ownedApiIds?.has(card.id) ?? false;
+                const isAboveFold = idx < 12;
                 return (
                   <div key={card.id} onClick={() => onAddCard(card)} className={`search-card${isOwned ? ' search-card--owned' : ''}`}>
                     {isOwned && (
@@ -827,7 +821,13 @@ export default function BinderView({
                         <Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />
                       </button>
                     )}
-                    <img src={card.images.small} alt={card.name} loading="lazy" decoding="async" />
+                    <img
+                      src={card.images.small}
+                      alt={card.name}
+                      loading={isAboveFold ? 'eager' : 'lazy'}
+                      fetchpriority={isAboveFold ? 'high' : 'auto'}
+                      decoding="async"
+                    />
                     <p>{card.name}</p>
                     <p className="text-muted" style={{ fontSize: '0.7rem', marginBottom: '4px' }}>{card.set.name}</p>
                     {p != null ? <p className="price">${p.toFixed(2)}</p> : null}

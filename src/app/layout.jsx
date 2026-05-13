@@ -50,6 +50,17 @@ export default async function RootLayout({ children }) {
 
   return (
     <html lang="en">
+      <head>
+        {/* Resource hints for card-image CDNs. Preconnect performs the
+            DNS lookup + TLS handshake before the first image is even
+            requested, shaving ~150-300ms off the time-to-first-image
+            on cold visits. Each card image after the first piggybacks
+            on the same warm HTTP/2 connection. */}
+        <link rel="preconnect" href="https://assets.tcgdex.net" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://assets.tcgdex.net" />
+        <link rel="preconnect" href="https://images.pokemontcg.io" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://images.pokemontcg.io" />
+      </head>
       <body>
         {/* Top progress bar — gives instant visual ack on every <Link>
             click so even a sub-100ms route change feels intentional.
