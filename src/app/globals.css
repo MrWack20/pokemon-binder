@@ -1827,6 +1827,28 @@ input[type="number"].input::-webkit-outer-spin-button {
 .sets-browse-card__number { font-size: 0.7rem; opacity: 0.4; margin-bottom: 4px; }
 .sets-browse-card__price { font-size: 0.82rem; font-weight: 700; color: #10b981; }
 .sets-browse-card__no-price { font-size: 0.72rem; opacity: 0.3; }
+/* Placeholder shown when TCGdex has no scan for a card (common for vintage
+   Japanese vintage sets like PMCG1-6, VS1, web1, E1-5, ADV1-4). */
+.sets-browse-card__no-image {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; aspect-ratio: 2.5/3.5; margin-bottom: 8px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+  border: 1px dashed rgba(255,255,255,0.12); border-radius: 8px;
+  font-size: 0.65rem; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.06em;
+}
+.search-card__no-image {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  width: 100%; aspect-ratio: 2.5/3.5; margin-bottom: 6px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+  border: 1px dashed rgba(255,255,255,0.12); border-radius: 6px;
+  font-size: 0.6rem; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.05em;
+}
+/* When the API returns a set symbol but no logo, render the symbol smaller
+   so it visually reads as an icon-style placeholder rather than a stretched
+   logo. */
+.set-card__symbol {
+  max-width: 56px; max-height: 56px; object-fit: contain; opacity: 0.75;
+}
 .sets-browse-card--owned { outline: 2px solid rgba(16,185,129,0.5); }
 .sets-browse-card__owned-badge {
   display: flex; align-items: center; gap: 3px;

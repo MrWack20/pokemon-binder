@@ -373,9 +373,15 @@ export default function SetsPage() {
                     {filteredSets.map(set => (
                       <div key={set.id} className="set-card" onClick={() => openPkmnSet(set)}>
                         <div className="set-card__logo-wrap">
+                          {/* Vintage Japanese sets often have no logo at all but
+                              do have a symbol; the neo-era sets are an example.
+                              Use logo first, fall back to symbol, then a generic
+                              icon so the tile never renders an empty box. */}
                           {set.images?.logo
                             ? <img src={set.images.logo} alt={set.name} className="set-card__logo" />
-                            : <Layers size={36} style={{ opacity: 0.4 }} />
+                            : set.images?.symbol
+                              ? <img src={set.images.symbol} alt={set.name} className="set-card__symbol" />
+                              : <Layers size={36} style={{ opacity: 0.4 }} />
                           }
                         </div>
                         <div className="set-card__info">
@@ -473,13 +479,19 @@ export default function SetsPage() {
                         >
                           <Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />
                         </button>
-                        <img
-                          src={card.images.small}
-                          alt={card.name}
-                          loading={isAboveFold ? 'eager' : 'lazy'}
-                          fetchpriority={isAboveFold ? 'high' : 'auto'}
-                          decoding="async"
-                        />
+                        {card.images?.small || card.images?.large
+                          ? <img
+                              src={card.images.small || card.images.large}
+                              alt={card.name}
+                              loading={isAboveFold ? 'eager' : 'lazy'}
+                              fetchpriority={isAboveFold ? 'high' : 'auto'}
+                              decoding="async"
+                            />
+                          : <div className="sets-browse-card__no-image" aria-label="No image available">
+                              <Layers size={28} style={{ opacity: 0.3 }} />
+                              <span>No scan</span>
+                            </div>
+                        }
                         <p className="sets-browse-card__name">{card.name}</p>
                         <p className="sets-browse-card__number">#{card.number}</p>
                         {price != null
@@ -562,13 +574,19 @@ export default function SetsPage() {
                           >
                             <Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />
                           </button>
-                          <img
-                            src={card.images?.small || card.images?.large}
-                            alt={card.name}
-                            loading={isAboveFold ? 'eager' : 'lazy'}
-                            fetchpriority={isAboveFold ? 'high' : 'auto'}
-                            decoding="async"
-                          />
+                          {card.images?.small || card.images?.large
+                            ? <img
+                                src={card.images.small || card.images.large}
+                                alt={card.name}
+                                loading={isAboveFold ? 'eager' : 'lazy'}
+                                fetchpriority={isAboveFold ? 'high' : 'auto'}
+                                decoding="async"
+                              />
+                            : <div className="sets-browse-card__no-image" aria-label="No image available">
+                                <Layers size={28} style={{ opacity: 0.3 }} />
+                                <span>No scan</span>
+                              </div>
+                          }
                           <p className="sets-browse-card__name">{card.name}</p>
                           {card.set?.name && <p className="sets-browse-card__number">{card.set.name}</p>}
                           {card._price != null

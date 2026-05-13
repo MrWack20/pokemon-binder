@@ -4,7 +4,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Edit2, ChevronLeft, ChevronRight, Filter, X, Search,
   Plus, GripVertical, SortAsc, Clock, LayoutGrid, Columns, Images, Maximize2, Heart, CheckCircle2,
-  Download, FileText, FileJson, FileImage, Share2, Globe,
+  Download, FileText, FileJson, FileImage, Share2, Globe, Image as ImageIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { exportBinderCsv, exportBinderJson } from '../lib/export.js';
@@ -821,13 +821,19 @@ export default function BinderView({
                         <Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />
                       </button>
                     )}
-                    <img
-                      src={card.images.small}
-                      alt={card.name}
-                      loading={isAboveFold ? 'eager' : 'lazy'}
-                      fetchpriority={isAboveFold ? 'high' : 'auto'}
-                      decoding="async"
-                    />
+                    {card.images?.small || card.images?.large
+                      ? <img
+                          src={card.images.small || card.images.large}
+                          alt={card.name}
+                          loading={isAboveFold ? 'eager' : 'lazy'}
+                          fetchpriority={isAboveFold ? 'high' : 'auto'}
+                          decoding="async"
+                        />
+                      : <div className="search-card__no-image" aria-label="No image available">
+                          <ImageIcon size={20} style={{ opacity: 0.3 }} />
+                          <span>No scan</span>
+                        </div>
+                    }
                     <p>{card.name}</p>
                     <p className="text-muted" style={{ fontSize: '0.7rem', marginBottom: '4px' }}>{card.set.name}</p>
                     {p != null ? <p className="price">${p.toFixed(2)}</p> : null}
